@@ -106,6 +106,7 @@ func Parse(src []byte) (doc *Document, err error) {
 func lowerDocument(root *gotreesitter.Node, lang *gotreesitter.Language, src []byte) *Document {
 	docRange := Range{Start: int(root.StartByte()), End: int(root.EndByte())}
 
+	doc := &Document{Range: docRange}
 	sys := &SystemDecl{Range: docRange}
 
 	for i := 0; i < root.NamedChildCount(); i++ {
@@ -114,6 +115,10 @@ func lowerDocument(root *gotreesitter.Node, lang *gotreesitter.Language, src []b
 			continue
 		}
 		switch child.Type(lang) {
+		case "import_decl":
+			if imp := lowerImport(child, lang, src); imp != nil {
+				doc.Imports = append(doc.Imports, imp)
+			}
 		case "element_decl":
 			if e := lowerElement(child, lang, src); e != nil {
 				sys.Elements = append(sys.Elements, e)
@@ -129,10 +134,53 @@ func lowerDocument(root *gotreesitter.Node, lang *gotreesitter.Language, src []b
 		}
 	}
 
-	return &Document{
-		Systems: []*SystemDecl{sys},
-		Range:   docRange,
+	doc.Systems = []*SystemDecl{sys}
+	return doc
+}
+
+// lowerImport converts an import_decl CST node into an *Import. The CST
+// exposes a single named field "path" referencing the STRING literal; the
+// surrounding quotes are stripped via decodeStringLiteral so the Path
+// matches the verbatim string written in source (e.g.
+// "../shared/platform.sir").
+func lowerImport(node *gotreesitter.Node, lang *gotreesitter.Language, src []byte) *Import {
+	pathNode := node.ChildByFieldName("path", lang)
+	if pathNode == nil {
+		return nil
 	}
+	return &Import{
+		Path:  decodeStringLiteral(nodeText(pathNode, src)),
+		Range: Range{Start: int(node.StartByte()), End: int(node.EndByte())},
+	}
+}
+
+// lowerRef converts a CST node that is either a bare "identifier" or a
+// "qualified_ident" into a *Ref. Qualified idents expose two named
+// children: "namespace" (the file-stem prefix) and "name" (the symbol
+// within that prefix). Bare identifiers yield a Ref with empty Namespace.
+// Returns nil for any other node type — callers should guard against
+// CST shape changes.
+func lowerRef(node *gotreesitter.Node, lang *gotreesitter.Language, src []byte) *Ref {
+	if node == nil {
+		return nil
+	}
+	r := Range{Start: int(node.StartByte()), End: int(node.EndByte())}
+	switch node.Type(lang) {
+	case "identifier":
+		return &Ref{Name: nodeText(node, src), Range: r}
+	case "qualified_ident":
+		nsNode := node.ChildByFieldName("namespace", lang)
+		nmNode := node.ChildByFieldName("name", lang)
+		if nsNode == nil || nmNode == nil {
+			return nil
+		}
+		return &Ref{
+			Namespace: nodeText(nsNode, src),
+			Name:      nodeText(nmNode, src),
+			Range:     r,
+		}
+	}
+	return nil
 }
 
 // lowerBoundary converts a single boundary_decl CST node into a *Boundary.
@@ -199,9 +247,15 @@ func lowerEdge(node *gotreesitter.Node, lang *gotreesitter.Language, src []byte)
 		return nil
 	}
 
+	// nodeText covers both shapes: a bare "identifier" yields its lexeme
+	// and a "qualified_ident" yields the verbatim "namespace.name" slice,
+	// which is exactly what the From/To string fields are documented to
+	// hold. FromRef/ToRef carry the structured form for resolver/lint use.
 	e := &Edge{
 		From:      nodeText(fromNode, src),
 		To:        nodeText(toNode, src),
+		FromRef:   lowerRef(fromNode, lang, src),
+		ToRef:     lowerRef(toNode, lang, src),
 		Direction: directionForArrow(nodeText(arrowNode, src)),
 		Kind:      EdgeKindFlow, // untyped fallback per spec
 		Range:     Range{Start: int(node.StartByte()), End: int(node.EndByte())},

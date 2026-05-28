@@ -9,8 +9,31 @@ type Range struct {
 
 // Document is the root of the IR.
 type Document struct {
+	Imports []*Import
 	Systems []*SystemDecl
 	Range   Range
+}
+
+// Import declares that another sirena source file's symbols should be
+// available in this file's namespace, prefixed by the imported file's stem
+// (e.g. `import "../shared/platform.sir"` makes its symbols reachable as
+// `platform.<name>`). Resolution happens in Phase 5; parse-time just
+// records the directive.
+type Import struct {
+	Path  string // verbatim string after "import" (relative or absolute as written)
+	Range Range
+}
+
+// Ref is a resolved identifier reference. At parse time, Name is the
+// identifier as written and Namespace is the optional prefix from a
+// qualified_ident (e.g. "platform" in "platform.kafka"). Definition is
+// populated by the workspace resolver in Phase 5; the placeholder comment
+// below is intentional so future readers know the field is coming.
+type Ref struct {
+	Namespace string // optional; empty for bare IDENT
+	Name      string // the identifier as written
+	Range     Range
+	// Definition Node // populated by the resolver (Phase 5).
 }
 
 // SystemDecl groups every top-level system-file declaration parsed from
@@ -107,9 +130,17 @@ func boundaryKindForKeyword(kw string) BoundaryKind {
 // resolver (Phase 5) populates ref bindings. Reverse/bidirectional shorthand
 // (<- and <->) does NOT swap From/To at parse time — Direction carries the
 // arrow shape so the printer round-trips byte-for-byte.
+//
+// FromRef and ToRef carry the same identifier in structured form
+// (Namespace + Name) for downstream consumers that need to distinguish a
+// qualified `platform.kafka` from a bare `kafka`. The string fields remain
+// the verbatim source text so the printer and external Go callers do not
+// have to reconstruct the namespace prefix themselves.
 type Edge struct {
 	From      string // source identifier as written (may be namespaced: "platform.kafka")
 	To        string // destination identifier as written
+	FromRef   *Ref   // structured form of From (Namespace + Name); never nil after Parse
+	ToRef     *Ref   // structured form of To (Namespace + Name); never nil after Parse
 	Kind      EdgeKind
 	Direction Direction
 	Label     string           // optional; empty when no label string follows

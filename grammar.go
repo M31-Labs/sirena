@@ -12,21 +12,24 @@ import "github.com/odvcencio/gotreesitter/grammargen"
 //
 // Grammar (informal EBNF):
 //
-//	source_file     → (element_decl | boundary_decl | edge_decl)*
-//	element_decl    → kind_keyword IDENT metadata_block?
-//	kind_keyword    → "service" | "database" | "queue" | "cache" | "job"
-//	                | "external" | "client" | "gateway" | "node"
-//	metadata_block  → "{" pair* "}"
-//	pair            → IDENT ":" value
-//	value           → STRING | NUMBER | IDENT | list
-//	list            → "[" value ("," value)* "]"
-//	boundary_decl   → "boundary" boundary_kind STRING metadata_block? boundary_block
-//	boundary_kind   → "trust" | "network" | "deployment" | "team"
-//	boundary_block  → "{" (element_decl | boundary_decl | edge_decl)* "}"
-//	edge_decl       → IDENT arrow IDENT (":" edge_kind STRING?)? metadata_block?
-//	arrow           → "->" | "<-" | "<->"
-//	edge_kind       → "calls" | "reads" | "writes" | "publishes"
-//	                | "subscribes" | "depends_on" | "flow"
+//	source_file      → (import_decl | element_decl | boundary_decl | edge_decl)*
+//	import_decl      → "import" STRING
+//	element_decl     → kind_keyword IDENT metadata_block?
+//	kind_keyword     → "service" | "database" | "queue" | "cache" | "job"
+//	                 | "external" | "client" | "gateway" | "node"
+//	metadata_block   → "{" pair* "}"
+//	pair             → IDENT ":" value
+//	value            → STRING | NUMBER | IDENT | list
+//	list             → "[" value ("," value)* "]"
+//	boundary_decl    → "boundary" boundary_kind STRING metadata_block? boundary_block
+//	boundary_kind    → "trust" | "network" | "deployment" | "team"
+//	boundary_block   → "{" (element_decl | boundary_decl | edge_decl)* "}"
+//	edge_decl        → (IDENT | qualified_ident) arrow (IDENT | qualified_ident)
+//	                   (":" edge_kind STRING?)? metadata_block?
+//	qualified_ident  → IDENT "." IDENT
+//	arrow            → "->" | "<-" | "<->"
+//	edge_kind        → "calls" | "reads" | "writes" | "publishes"
+//	                 | "subscribes" | "depends_on" | "flow"
 //
 // Whitespace (including newlines) and comments are extras. Comments are
 // not yet defined; TODO(task-N): comments lands when the comment lint is
@@ -34,12 +37,28 @@ import "github.com/odvcencio/gotreesitter/grammargen"
 func SirenaGrammar() *grammargen.Grammar {
 	g := grammargen.NewGrammar("sirena")
 
-	// source_file → (element_decl | boundary_decl | edge_decl)*
+	// source_file → (import_decl | element_decl | boundary_decl | edge_decl)*
+	//
+	// import_decl is top-level only — it does not nest inside boundaries —
+	// so the LALR-state-merge workaround that applies to boundary_decl /
+	// edge_decl (a `_nested` sibling aliased back to the canonical name)
+	// is NOT required here.
 	g.Define("source_file", grammargen.Repeat(grammargen.Choice(
+		grammargen.Sym("import_decl"),
 		grammargen.Sym("element_decl"),
 		grammargen.Sym("boundary_decl"),
 		grammargen.Sym("edge_decl"),
 	)))
+
+	// import_decl → "import" STRING
+	//
+	// The path is captured as a STRING literal; lowerImport strips the
+	// quotes via decodeStringLiteral. Resolution against the workspace
+	// happens in Phase 5; parse-time just records the directive.
+	g.Define("import_decl", grammargen.Seq(
+		grammargen.Str("import"),
+		grammargen.Field("path", grammargen.Sym("string")),
+	))
 
 	// element_decl → kind_keyword IDENT metadata_block?
 	g.Define("element_decl", grammargen.Seq(
@@ -116,17 +135,21 @@ func SirenaGrammar() *grammargen.Grammar {
 		grammargen.Str("}"),
 	))
 
-	// edge_decl → IDENT arrow IDENT (":" edge_kind STRING?)? metadata_block?
+	// edge_decl → ident_or_qualified arrow ident_or_qualified
+	//             (":" edge_kind STRING?)? metadata_block?
 	//
 	// Edge metadata is the optional trailing block; no ambiguity arises
 	// because nothing else syntactically follows an edge declaration.
 	//
-	// TODO(task-7): accept qualified_ident (IDENT.IDENT) for namespaced
-	// endpoints once the import grammar lands.
+	// `from` and `to` accept either a bare IDENT or a qualified_ident
+	// (IDENT "." IDENT) so an imported namespace can be referenced as
+	// `platform.kafka`. Lowering picks both apart into the structured
+	// Edge.FromRef / Edge.ToRef while preserving the verbatim text in
+	// Edge.From / Edge.To.
 	g.Define("edge_decl", grammargen.Seq(
-		grammargen.Field("from", grammargen.Sym("identifier")),
+		grammargen.Field("from", grammargen.Sym("_ident_or_qualified")),
 		grammargen.Field("arrow", grammargen.Sym("arrow")),
-		grammargen.Field("to", grammargen.Sym("identifier")),
+		grammargen.Field("to", grammargen.Sym("_ident_or_qualified")),
 		grammargen.Optional(grammargen.Seq(
 			grammargen.Str(":"),
 			grammargen.Field("kind", grammargen.Sym("edge_kind")),
@@ -143,15 +166,36 @@ func SirenaGrammar() *grammargen.Grammar {
 	// on the reference rewrites the CST node type back to "edge_decl" so
 	// downstream lowering does not need to special-case the sibling.
 	g.Define("edge_decl_nested", grammargen.Seq(
-		grammargen.Field("from", grammargen.Sym("identifier")),
+		grammargen.Field("from", grammargen.Sym("_ident_or_qualified")),
 		grammargen.Field("arrow", grammargen.Sym("arrow")),
-		grammargen.Field("to", grammargen.Sym("identifier")),
+		grammargen.Field("to", grammargen.Sym("_ident_or_qualified")),
 		grammargen.Optional(grammargen.Seq(
 			grammargen.Str(":"),
 			grammargen.Field("kind", grammargen.Sym("edge_kind")),
 			grammargen.Optional(grammargen.Field("label", grammargen.Sym("string"))),
 		)),
 		grammargen.Optional(grammargen.Field("metadata", grammargen.Sym("metadata_block"))),
+	))
+
+	// _ident_or_qualified is a hidden choice between a bare identifier
+	// and a qualified identifier (IDENT "." IDENT). Used by edge_decl /
+	// edge_decl_nested so namespaced endpoints from imports parse
+	// cleanly. Hiding the choice (leading underscore) keeps the CST flat
+	// — the named child of the `from` / `to` field is either an
+	// "identifier" or a "qualified_ident", mirroring the `_value` shape.
+	g.Define("_ident_or_qualified", grammargen.Choice(
+		grammargen.Sym("qualified_ident"),
+		grammargen.Sym("identifier"),
+	))
+
+	// qualified_ident → IDENT "." IDENT
+	//
+	// The two named children are "namespace" (the import-file stem) and
+	// "name" (the identifier within that import).
+	g.Define("qualified_ident", grammargen.Seq(
+		grammargen.Field("namespace", grammargen.Sym("identifier")),
+		grammargen.Str("."),
+		grammargen.Field("name", grammargen.Sym("identifier")),
 	))
 
 	// arrow → "->" | "<-" | "<->"

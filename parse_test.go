@@ -406,3 +406,59 @@ func TestParse_BoundaryNested_TwoLevels(t *testing.T) {
 		t.Errorf("inner.Children[0]: %+v", db)
 	}
 }
+
+func TestParse_Import(t *testing.T) {
+	src := []byte(`import "../shared/platform.sir"`)
+	doc, err := sirena.Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(doc.Imports) != 1 {
+		t.Fatalf("Imports: %d", len(doc.Imports))
+	}
+	if doc.Imports[0].Path != "../shared/platform.sir" {
+		t.Errorf("Path: %q", doc.Imports[0].Path)
+	}
+}
+
+func TestParse_Import_Multiple(t *testing.T) {
+	src := []byte(`import "../a.sir"
+import "../b.sir"
+service api`)
+	doc, err := sirena.Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(doc.Imports) != 2 {
+		t.Errorf("Imports: %d", len(doc.Imports))
+	}
+	if len(doc.Systems) != 1 || len(doc.Systems[0].Elements) != 1 {
+		t.Errorf("Elements: %d", len(doc.Systems[0].Elements))
+	}
+}
+
+func TestParse_QualifiedEdgeTarget(t *testing.T) {
+	src := []byte(`import "../shared/platform.sir"
+service api
+api -> platform.kafka: publishes`)
+	doc, err := sirena.Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(doc.Systems) != 1 || len(doc.Systems[0].Edges) != 1 {
+		t.Fatalf("expected 1 edge, doc=%+v", doc)
+	}
+	e := doc.Systems[0].Edges[0]
+	if e.From != "api" {
+		t.Errorf("From: %q", e.From)
+	}
+	if e.To != "platform.kafka" {
+		t.Errorf("To: %q", e.To)
+	}
+	if e.ToRef == nil || e.ToRef.Namespace != "platform" || e.ToRef.Name != "kafka" {
+		t.Errorf("ToRef: %#v", e.ToRef)
+	}
+	if e.FromRef == nil || e.FromRef.Namespace != "" || e.FromRef.Name != "api" {
+		t.Errorf("FromRef: %#v", e.FromRef)
+	}
+}
