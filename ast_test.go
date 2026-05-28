@@ -198,6 +198,52 @@ func TestIR_ZeroValue(t *testing.T) {
 	if diag.Range != (Range{}) {
 		t.Error("Diagnostic.Range zero not Range{}")
 	}
+
+	var ws Workspace
+	if ws.Root != "" || ws.Mode != ModeUnknown || ws.Manifest != nil || ws.Files != nil {
+		t.Error("Workspace zero non-zero")
+	}
+
+	var wf WorkspaceFile
+	if wf.Path != "" || wf.RelPath != "" || wf.Kind != FileKindUnknown ||
+		wf.Document != nil || wf.LoadErr != nil {
+		t.Error("WorkspaceFile zero non-zero")
+	}
+}
+
+// TestIR_WorkspaceModeString pins every WorkspaceMode constant to its
+// short diagnostic label. ModeUnknown is the zero value so a forgotten
+// Mode assignment surfaces as "unknown" in diagnostics rather than as a
+// real mode.
+func TestIR_WorkspaceModeString(t *testing.T) {
+	cases := map[WorkspaceMode]string{
+		ModeUnknown:            "unknown",
+		ModeStandalone:         "standalone",
+		ModeSelfContained:      "self-contained",
+		ModeWorkspaceResolving: "workspace-resolving",
+	}
+	for m, want := range cases {
+		if got := m.String(); got != want {
+			t.Errorf("WorkspaceMode(%d).String() = %q, want %q", m, got, want)
+		}
+	}
+}
+
+// TestIR_FileKindString pins every FileKind constant to its short label.
+// FileKindUnknown stringifies to "unknown" so misclassified files surface
+// in diagnostics rather than as a real kind.
+func TestIR_FileKindString(t *testing.T) {
+	cases := map[FileKind]string{
+		FileKindUnknown:   "unknown",
+		FileKindSystem:    "system",
+		FileKindGenSystem: "gen-system",
+		FileKindView:      "view",
+	}
+	for k, want := range cases {
+		if got := k.String(); got != want {
+			t.Errorf("FileKind(%d).String() = %q, want %q", k, got, want)
+		}
+	}
 }
 
 // TestIR_SeverityString pins every Severity constant to its short label.
