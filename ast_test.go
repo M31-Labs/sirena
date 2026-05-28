@@ -222,6 +222,39 @@ func TestIR_ZeroValue(t *testing.T) {
 	if fo.WorkspaceRoot != "" || fo.ViewRef != "" {
 		t.Error("FenceOptions zero non-zero")
 	}
+
+	var rv ResolvedView
+	if rv.Source != nil {
+		t.Error("ResolvedView.Source zero not nil")
+	}
+	if rv.Elements != nil || rv.Boundaries != nil || rv.Edges != nil ||
+		rv.Summaries != nil {
+		t.Error("ResolvedView slice fields zero not nil")
+	}
+	if rv.RenderDefaults != nil {
+		t.Error("ResolvedView.RenderDefaults zero not nil")
+	}
+
+	var bs BoundarySummary
+	if bs.Boundary != nil {
+		t.Error("BoundarySummary.Boundary zero not nil")
+	}
+	if bs.HiddenChildren != 0 {
+		t.Errorf("BoundarySummary.HiddenChildren zero = %d", bs.HiddenChildren)
+	}
+	if bs.Label != "" {
+		t.Error("BoundarySummary.Label zero not empty")
+	}
+
+	var rd RenderDefault
+	if rd.Shape != "" || rd.Color != "" || rd.Icon != "" {
+		t.Error("RenderDefault zero non-zero")
+	}
+
+	var p Preset
+	if p.Name != "" || p.RenderForKind != nil || p.AutoCollapseChildCount != 0 {
+		t.Error("Preset zero non-zero")
+	}
 }
 
 // TestIR_WorkspaceModeString pins every WorkspaceMode constant to its
