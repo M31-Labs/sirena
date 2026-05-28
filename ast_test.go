@@ -255,6 +255,48 @@ func TestIR_ZeroValue(t *testing.T) {
 	if p.Name != "" || p.RenderForKind != nil || p.AutoCollapseChildCount != 0 {
 		t.Error("Preset zero non-zero")
 	}
+
+	var br BudgetReport
+	if br.Breaches != nil || br.Suggestions != nil {
+		t.Error("BudgetReport zero non-zero")
+	}
+
+	var bch Breach
+	if bch.Field != "" || bch.Limit != 0 || bch.Actual != 0 {
+		t.Error("Breach zero non-zero")
+	}
+	if bch.Target != (Ref{}) {
+		t.Error("Breach.Target zero not Ref{}")
+	}
+
+	var sg Suggestion
+	if sg.Kind != SuggestionUnknown {
+		t.Errorf("Suggestion.Kind zero = %v, want SuggestionUnknown", sg.Kind)
+	}
+	if sg.Target != (Ref{}) {
+		t.Error("Suggestion.Target zero not Ref{}")
+	}
+	if sg.Estimate != (SuggestionEstimate{}) {
+		t.Error("Suggestion.Estimate zero non-zero")
+	}
+	if sg.Rationale != "" {
+		t.Error("Suggestion.Rationale zero not empty")
+	}
+
+	var se SuggestionEstimate
+	if se.NodesReclaimed != 0 || se.EdgesReclaimed != 0 {
+		t.Error("SuggestionEstimate zero non-zero")
+	}
+
+	var ro RenderOptions
+	if ro.StrictBudget {
+		t.Error("RenderOptions.StrictBudget zero not false")
+	}
+
+	var lr LayoutResult
+	if lr.View != nil {
+		t.Error("LayoutResult.View zero not nil")
+	}
 }
 
 // TestIR_WorkspaceModeString pins every WorkspaceMode constant to its
@@ -510,6 +552,25 @@ func TestIR_OverrideModeString(t *testing.T) {
 	for m, want := range cases {
 		if got := m.String(); got != want {
 			t.Errorf("OverrideMode(%d).String() = %q, want %q", m, got, want)
+		}
+	}
+}
+
+// TestIR_SuggestionKindString pins every SuggestionKind constant to its
+// canonical short label. SuggestionUnknown is the zero value so a
+// forgotten Kind assignment surfaces as "unknown" rather than a real
+// suggestion.
+func TestIR_SuggestionKindString(t *testing.T) {
+	cases := map[SuggestionKind]string{
+		SuggestionUnknown:          "unknown",
+		SuggestionCollapseBoundary: "collapse-boundary",
+		SuggestionDropEdgeKind:     "drop-edge-kind",
+		SuggestionSplitView:        "split-view",
+		SuggestionRaiseZoomLevel:   "raise-zoom-level",
+	}
+	for k, want := range cases {
+		if got := k.String(); got != want {
+			t.Errorf("SuggestionKind(%d).String() = %q, want %q", k, got, want)
 		}
 	}
 }
