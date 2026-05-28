@@ -95,9 +95,13 @@ type BoundaryKind int
 const (
 	// BoundaryKindUnknown is the zero value; not a valid boundary kind.
 	BoundaryKindUnknown BoundaryKind = iota
+	// BoundaryKindTrust is a security/trust boundary (rendered dashed).
 	BoundaryKindTrust
+	// BoundaryKindNetwork is a network-topology boundary (e.g. VPC, subnet).
 	BoundaryKindNetwork
+	// BoundaryKindDeployment is a deployment-target boundary (e.g. region, cluster).
 	BoundaryKindDeployment
+	// BoundaryKindTeam is an organizational ownership boundary.
 	BoundaryKindTeam
 )
 
@@ -409,8 +413,11 @@ type ViewDecl struct {
 type Selector struct {
 	Kind        SelectorKind // discriminator (boundary, element, edges in/out)
 	ElementKind ElementKind  // populated only when Kind == SelectorElement
-	Target      string       // boundary name, element name, or edge endpoint
-	Range       Range
+	// Target is the resolved STRING literal — surrounding double quotes
+	// are already stripped by decodeStringLiteral, so a source `"pci"`
+	// lands here as `pci`. The printer re-quotes when emitting.
+	Target string
+	Range  Range
 }
 
 // SelectorKind enumerates the selector forms allowed in a view's
@@ -518,10 +525,10 @@ func (m OverrideMode) String() string {
 // was explicitly set to zero", which the evaluator treats as forbidding
 // anything in that category).
 type Budget struct {
-	Nodes          int
-	EdgesPerNode   int
-	Depth          int
-	BoundaryFanout int
-	LabelChars     int
+	Nodes          int // hard cap on total rendered nodes (elements + boundaries).
+	EdgesPerNode   int // cap on edges incident to any single node; overflow drops the lowest-priority edges.
+	Depth          int // cap on boundary nesting depth; deeper boundaries are collapsed into their parent.
+	BoundaryFanout int // cap on direct children any single boundary may project; overflow groups extras under an ellipsis.
+	LabelChars     int // cap on the rendered length of each edge label; overflow is truncated with an ellipsis.
 	Range          Range
 }

@@ -63,8 +63,10 @@ func MustParse(src []byte) *Document {
 // recovered panic yields a Document carrying a SIR-PARSE-000 diagnostic
 // (mirroring mdpp's approach in parse.go).
 //
-// For v0.1, Parse only understands element declarations and metadata
-// blocks. Subsequent tasks extend the grammar and the lowering.
+// Parse understands the full v0.1 grammar: imports, element / boundary /
+// edge declarations with optional metadata blocks and `@override`
+// annotations, qualified identifier references on edge endpoints, and
+// view declarations with layout hints and budgets.
 func Parse(src []byte) (doc *Document, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -613,6 +615,10 @@ func lowerBudgetDecl(node *gotreesitter.Node, lang *gotreesitter.Language, src [
 		if keyNode == nil || valNode == nil {
 			continue
 		}
+		// The grammar restricts budget_pair values to `number`, which
+		// only ever lexes a strconv.ParseFloat-compatible literal, so
+		// this err path is dead by construction. We keep the guard for
+		// defense-in-depth in case the grammar is loosened later.
 		n, err := strconv.ParseFloat(nodeText(valNode, src), 64)
 		if err != nil {
 			continue
@@ -709,12 +715,14 @@ func lowerOverride(node *gotreesitter.Node, lang *gotreesitter.Language, src []b
 	return o
 }
 
-// lowerMetadataBlock walks a metadata_block CST node and returns its pairs
-// as a typed map. Returns nil when the block contains no pairs (an empty
-// `{}` block stays nil to keep the IR canonical and to preserve the "no
-// metadata declared" vs "metadata declared but empty" distinction — we
-// collapse both to nil because empty maps are not semantically useful for
-// downstream consumers). Shared by lowerElement, lowerBoundary, lowerEdge.
+// lowerMetadataBlock turns a metadata_block CST node into a
+// map[string]Value. Returns nil both when the block is absent (the
+// caller-side ChildByFieldName guard never invokes us in that case) and
+// when the block has no pairs. We collapse "no metadata declared" and
+// "empty metadata block" to the same nil result because empty maps are
+// not semantically distinguished by downstream consumers, and the
+// canonical nil shape keeps round-trip diffs minimal. Shared by
+// lowerElement, lowerBoundary, lowerEdge.
 func lowerMetadataBlock(node *gotreesitter.Node, lang *gotreesitter.Language, src []byte) map[string]Value {
 	var out map[string]Value
 	for i := 0; i < node.NamedChildCount(); i++ {

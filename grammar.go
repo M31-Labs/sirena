@@ -4,10 +4,14 @@ import "github.com/odvcencio/gotreesitter/grammargen"
 
 // SirenaGrammar returns the v0.1 sirena grammar.
 //
-// The grammar covers the minimum surface required by Phase 2, Tasks 3-8:
-// element declarations with optional metadata blocks, typed boundary
-// containers that may nest elements and further boundaries, typed
-// directed edges between elements, and view declarations with
+// The grammar covers the full surface delivered by Phase 2, Tasks 3-9:
+// import declarations, element declarations with optional metadata
+// blocks, typed boundary containers (with optional metadata blocks) that
+// may nest elements and further boundaries, typed directed edges between
+// elements with optional metadata blocks and qualified-identifier
+// endpoints (`platform.kafka`), `@override` annotations on element /
+// boundary / edge declarations (bare, field-listed, or
+// except-listed), and view declarations with
 // title/preset/include/expand/collapse/theme directives plus optional
 // `layout { ... }` and `budget { ... }` sub-blocks.
 //
@@ -119,6 +123,14 @@ func SirenaGrammar() *grammargen.Grammar {
 	// boundary_block contains nested declarations starting with kind keywords.
 	// override_annotation slots between the boundary name and the optional
 	// metadata block; its leading `@` token is unambiguous.
+	//
+	// Empty-block edge case: `boundary trust "pci" {}` parses with the
+	// metadata_block omitted and the single `{}` consumed as the
+	// boundary_block (with zero children). The grammar never produces
+	// both an empty metadata_block AND an empty boundary_block — LR(1)
+	// commits to boundary_block for the only `{...}` pair because the
+	// lookahead at `}` is consistent only with boundary_block's closing
+	// brace shape.
 	g.Define("boundary_decl", grammargen.Seq(
 		grammargen.Str("boundary"),
 		grammargen.Field("kind", grammargen.Sym("boundary_kind")),
@@ -236,6 +248,12 @@ func SirenaGrammar() *grammargen.Grammar {
 	))
 
 	// arrow → "->" | "<-" | "<->"
+	//
+	// Order matters: "<->" must appear before "<-" so tree-sitter's
+	// longest-match lexer picks the trigraph; reordering will silently
+	// break bidirectional edges by lexing them as a "<-" followed by a
+	// stray ">" that fails the parser at the next state. "->" position
+	// is incidental because no other arrow shares its prefix.
 	g.Define("arrow", grammargen.Choice(
 		grammargen.Str("<->"),
 		grammargen.Str("->"),
