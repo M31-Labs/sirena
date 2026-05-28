@@ -4,32 +4,51 @@ import "github.com/odvcencio/gotreesitter/grammargen"
 
 // SirenaGrammar returns the v0.1 sirena grammar.
 //
-// The grammar covers the minimum surface required by Phase 2, Tasks 3-5:
+// The grammar covers the minimum surface required by Phase 2, Tasks 3-8:
 // element declarations with optional metadata blocks, typed boundary
-// containers that may nest elements and further boundaries, and typed
-// directed edges between elements. Later tasks in Phase 2 extend this
-// with views and overrides.
+// containers that may nest elements and further boundaries, typed
+// directed edges between elements, and view declarations with
+// title/preset/include/expand/collapse/theme directives plus optional
+// `layout { ... }` and `budget { ... }` sub-blocks.
 //
 // Grammar (informal EBNF):
 //
-//	source_file      → (import_decl | element_decl | boundary_decl | edge_decl)*
-//	import_decl      → "import" STRING
-//	element_decl     → kind_keyword IDENT metadata_block?
-//	kind_keyword     → "service" | "database" | "queue" | "cache" | "job"
-//	                 | "external" | "client" | "gateway" | "node"
-//	metadata_block   → "{" pair* "}"
-//	pair             → IDENT ":" value
-//	value            → STRING | NUMBER | IDENT | list
-//	list             → "[" value ("," value)* "]"
-//	boundary_decl    → "boundary" boundary_kind STRING metadata_block? boundary_block
-//	boundary_kind    → "trust" | "network" | "deployment" | "team"
-//	boundary_block   → "{" (element_decl | boundary_decl | edge_decl)* "}"
-//	edge_decl        → (IDENT | qualified_ident) arrow (IDENT | qualified_ident)
-//	                   (":" edge_kind STRING?)? metadata_block?
-//	qualified_ident  → IDENT "." IDENT
-//	arrow            → "->" | "<-" | "<->"
-//	edge_kind        → "calls" | "reads" | "writes" | "publishes"
-//	                 | "subscribes" | "depends_on" | "flow"
+//	source_file       → (import_decl | element_decl | boundary_decl | edge_decl | view_decl)*
+//	import_decl       → "import" STRING
+//	element_decl      → kind_keyword IDENT metadata_block?
+//	kind_keyword      → "service" | "database" | "queue" | "cache" | "job"
+//	                  | "external" | "client" | "gateway" | "node"
+//	metadata_block    → "{" pair* "}"
+//	pair              → IDENT ":" value
+//	value             → STRING | NUMBER | IDENT | list
+//	list              → "[" value ("," value)* "]"
+//	boundary_decl     → "boundary" boundary_kind STRING metadata_block? boundary_block
+//	boundary_kind     → "trust" | "network" | "deployment" | "team"
+//	boundary_block    → "{" (element_decl | boundary_decl | edge_decl)* "}"
+//	edge_decl         → (IDENT | qualified_ident) arrow (IDENT | qualified_ident)
+//	                    (":" edge_kind STRING?)? metadata_block?
+//	qualified_ident   → IDENT "." IDENT
+//	arrow             → "->" | "<-" | "<->"
+//	edge_kind         → "calls" | "reads" | "writes" | "publishes"
+//	                  | "subscribes" | "depends_on" | "flow"
+//	view_decl         → "view" STRING view_block
+//	view_block        → "{" (view_pair | layout_decl | budget_decl)* "}"
+//	view_pair         → IDENT ":" view_value
+//	view_value        → STRING | NUMBER | IDENT | list | selector_list
+//	selector_list     → "[" selector ("," selector)* "]"
+//	selector          → boundary_selector | element_selector | edges_selector
+//	boundary_selector → "boundary" STRING
+//	element_selector  → kind_keyword STRING
+//	edges_selector    → "edges" ":" ("incoming" "to" | "outgoing" "from") STRING
+//	layout_decl       → "layout" layout_block
+//	layout_block      → "{" layout_pair* "}"
+//	layout_pair       → IDENT ":" layout_value
+//	layout_value      → STRING | NUMBER | IDENT | pin_map
+//	pin_map           → "{" pin_pair ("," pin_pair)* "}"
+//	pin_pair          → STRING ":" IDENT
+//	budget_decl       → "budget" budget_block
+//	budget_block      → "{" budget_pair* "}"
+//	budget_pair       → IDENT ":" NUMBER
 //
 // Whitespace (including newlines) and comments are extras. Comments are
 // not yet defined; TODO(task-N): comments lands when the comment lint is
@@ -37,17 +56,18 @@ import "github.com/odvcencio/gotreesitter/grammargen"
 func SirenaGrammar() *grammargen.Grammar {
 	g := grammargen.NewGrammar("sirena")
 
-	// source_file → (import_decl | element_decl | boundary_decl | edge_decl)*
+	// source_file → (import_decl | element_decl | boundary_decl | edge_decl | view_decl)*
 	//
-	// import_decl is top-level only — it does not nest inside boundaries —
-	// so the LALR-state-merge workaround that applies to boundary_decl /
-	// edge_decl (a `_nested` sibling aliased back to the canonical name)
-	// is NOT required here.
+	// import_decl and view_decl are top-level only — neither nests inside
+	// boundaries — so the LALR-state-merge workaround that applies to
+	// boundary_decl / edge_decl (a `_nested` sibling aliased back to the
+	// canonical name) is NOT required for either.
 	g.Define("source_file", grammargen.Repeat(grammargen.Choice(
 		grammargen.Sym("import_decl"),
 		grammargen.Sym("element_decl"),
 		grammargen.Sym("boundary_decl"),
 		grammargen.Sym("edge_decl"),
+		grammargen.Sym("view_decl"),
 	)))
 
 	// import_decl → "import" STRING
@@ -247,6 +267,182 @@ func SirenaGrammar() *grammargen.Grammar {
 		grammargen.Str("]"),
 	))
 
+	// view_decl → "view" STRING view_block
+	//
+	// View declarations are top-level only and start with the dedicated
+	// "view" keyword, which lex-promotes against the `identifier` word
+	// rule so there is no conflict with arbitrary identifier-keyed pairs.
+	g.Define("view_decl", grammargen.Seq(
+		grammargen.Str("view"),
+		grammargen.Field("name", grammargen.Sym("string")),
+		grammargen.Field("body", grammargen.Sym("view_block")),
+	))
+
+	// view_block → "{" (view_pair | layout_decl | budget_decl)* "}"
+	//
+	// `layout` and `budget` are dedicated keywords (Str()-promoted via the
+	// `identifier` word rule). At the start of a directive the parser
+	// distinguishes them from a generic IDENT-keyed view_pair by their
+	// distinct terminal symbol; once past the keyword the disambiguation
+	// is unambiguous (a view_pair has ":" as its second token, while
+	// layout_decl / budget_decl have "{").
+	g.Define("view_block", grammargen.Seq(
+		grammargen.Str("{"),
+		grammargen.Repeat(grammargen.Choice(
+			grammargen.Sym("layout_decl"),
+			grammargen.Sym("budget_decl"),
+			grammargen.Sym("view_pair"),
+		)),
+		grammargen.Str("}"),
+	))
+
+	// view_pair → IDENT ":" _view_value
+	//
+	// Distinct from the metadata-block `pair` rule because the value
+	// position accepts an additional shape (`selector_list`) that is
+	// invalid in element / boundary / edge metadata. Keeping these two
+	// pair rules separate avoids polluting `_value` with selector forms.
+	g.Define("view_pair", grammargen.Seq(
+		grammargen.Field("key", grammargen.Sym("identifier")),
+		grammargen.Str(":"),
+		grammargen.Field("value", grammargen.Sym("_view_value")),
+	))
+
+	// _view_value is the hidden choice for view_pair right-hand sides.
+	// `list` and `selector_list` both start with "[" — LR(1) disambiguates
+	// at the next token: a selector-leading keyword (boundary / a
+	// kind_keyword / edges) routes to selector_list, while any IDENT /
+	// STRING / NUMBER routes to the generic value list. `dashed_ident`
+	// admits kebab-case atoms like `earth-default` so theme/preset
+	// directives can use the source convention without quoting.
+	g.Define("_view_value", grammargen.Choice(
+		grammargen.Sym("string"),
+		grammargen.Sym("number"),
+		grammargen.Sym("identifier"),
+		grammargen.Sym("dashed_ident"),
+		grammargen.Sym("selector_list"),
+		grammargen.Sym("list"),
+	))
+
+	// selector_list → "[" selector* "]"
+	//
+	// Selectors are whitespace-separated (newlines are extras) rather than
+	// comma-separated — the spec's include block lists items one per line
+	// with no punctuation between them. Each selector starts with a
+	// distinct terminal (`boundary` / a kind_keyword / `edges`) so the
+	// parser does not need a separator to detect item boundaries.
+	g.Define("selector_list", grammargen.Seq(
+		grammargen.Str("["),
+		grammargen.Repeat(grammargen.Sym("_selector")),
+		grammargen.Str("]"),
+	))
+
+	// _selector is the hidden choice among the three selector forms.
+	// Each form starts with a distinct terminal (`boundary` / kind_keyword
+	// / `edges`) so LR(1) routes unambiguously.
+	g.Define("_selector", grammargen.Choice(
+		grammargen.Sym("boundary_selector"),
+		grammargen.Sym("edges_selector"),
+		grammargen.Sym("element_selector"),
+	))
+
+	// boundary_selector → "boundary" STRING
+	g.Define("boundary_selector", grammargen.Seq(
+		grammargen.Str("boundary"),
+		grammargen.Field("target", grammargen.Sym("string")),
+	))
+
+	// element_selector → kind_keyword STRING
+	//
+	// Reuses the same kind_keyword nonterminal element_decl uses, so the
+	// element_kind enum mapping logic in lowering applies unchanged.
+	g.Define("element_selector", grammargen.Seq(
+		grammargen.Field("kind", grammargen.Sym("kind_keyword")),
+		grammargen.Field("target", grammargen.Sym("string")),
+	))
+
+	// edges_selector → "edges" ":" ("incoming" "to" | "outgoing" "from") STRING
+	//
+	// `incoming`, `outgoing`, `to`, `from` are keyword-promoted via Str()
+	// so the parser rejects misuse at parse time. The two direction
+	// branches each carry their own preposition because the spec pairs
+	// "incoming" with "to" and "outgoing" with "from".
+	g.Define("edges_selector", grammargen.Seq(
+		grammargen.Str("edges"),
+		grammargen.Str(":"),
+		grammargen.Field("direction", grammargen.Choice(
+			grammargen.Seq(grammargen.Str("incoming"), grammargen.Str("to")),
+			grammargen.Seq(grammargen.Str("outgoing"), grammargen.Str("from")),
+		)),
+		grammargen.Field("target", grammargen.Sym("string")),
+	))
+
+	// layout_decl → "layout" layout_block
+	g.Define("layout_decl", grammargen.Seq(
+		grammargen.Str("layout"),
+		grammargen.Field("body", grammargen.Sym("layout_block")),
+	))
+
+	// layout_block → "{" layout_pair* "}"
+	g.Define("layout_block", grammargen.Seq(
+		grammargen.Str("{"),
+		grammargen.Repeat(grammargen.Sym("layout_pair")),
+		grammargen.Str("}"),
+	))
+
+	// layout_pair → IDENT ":" _layout_value
+	g.Define("layout_pair", grammargen.Seq(
+		grammargen.Field("key", grammargen.Sym("identifier")),
+		grammargen.Str(":"),
+		grammargen.Field("value", grammargen.Sym("_layout_value")),
+	))
+
+	// _layout_value is the hidden choice for layout_pair right-hand sides.
+	// pin_map is the only shape whose first token is "{", so LR(1)
+	// disambiguates trivially. `dashed_ident` parallels its use in
+	// _view_value so a layout `direction: top-down` lexes as one atom.
+	g.Define("_layout_value", grammargen.Choice(
+		grammargen.Sym("string"),
+		grammargen.Sym("number"),
+		grammargen.Sym("identifier"),
+		grammargen.Sym("dashed_ident"),
+		grammargen.Sym("pin_map"),
+	))
+
+	// pin_map → "{" pin_pair ("," pin_pair)* "}"
+	g.Define("pin_map", grammargen.Seq(
+		grammargen.Str("{"),
+		grammargen.Optional(grammargen.CommaSep1(grammargen.Sym("pin_pair"))),
+		grammargen.Str("}"),
+	))
+
+	// pin_pair → STRING ":" IDENT
+	g.Define("pin_pair", grammargen.Seq(
+		grammargen.Field("name", grammargen.Sym("string")),
+		grammargen.Str(":"),
+		grammargen.Field("side", grammargen.Sym("identifier")),
+	))
+
+	// budget_decl → "budget" budget_block
+	g.Define("budget_decl", grammargen.Seq(
+		grammargen.Str("budget"),
+		grammargen.Field("body", grammargen.Sym("budget_block")),
+	))
+
+	// budget_block → "{" budget_pair* "}"
+	g.Define("budget_block", grammargen.Seq(
+		grammargen.Str("{"),
+		grammargen.Repeat(grammargen.Sym("budget_pair")),
+		grammargen.Str("}"),
+	))
+
+	// budget_pair → IDENT ":" NUMBER
+	g.Define("budget_pair", grammargen.Seq(
+		grammargen.Field("key", grammargen.Sym("identifier")),
+		grammargen.Str(":"),
+		grammargen.Field("value", grammargen.Sym("number")),
+	))
+
 	// identifier → [A-Za-z_][A-Za-z0-9_]*
 	// Word rule so kind_keyword's anonymous tokens are matched against it
 	// for keyword-vs-identifier disambiguation.
@@ -255,6 +451,32 @@ func SirenaGrammar() *grammargen.Grammar {
 		grammargen.Repeat(grammargen.Pat(`[A-Za-z0-9_]`)),
 	)))
 	g.SetWord("identifier")
+
+	// dashed_ident → identifier ("-" identifier)+
+	//
+	// A kebab-case atom — used only inside view/layout pair right-hand
+	// sides where authors write theme names like `earth-default` and
+	// flow hints like `top-down` without quoting. The trailing dash run
+	// is Repeat1 (NOT Repeat) so plain `earth` continues to lex as a
+	// regular `identifier`; only inputs containing at least one internal
+	// dash promote to dashed_ident. Tree-sitter's lexer prefers the
+	// longest match, so `earth-default` is preferred over the prefix
+	// `earth` when the trailing `-default` is present.
+	//
+	// The dash-run REQUIRES the next character after `-` to be an
+	// identifier head character; an isolated trailing dash (e.g.
+	// `earth- `) does NOT promote to dashed_ident. This keeps `api -> db`
+	// safe — the lexer never tries to glue the leading `-` of the arrow
+	// onto the preceding identifier.
+	g.Define("dashed_ident", grammargen.Token(grammargen.Seq(
+		grammargen.Pat(`[A-Za-z_]`),
+		grammargen.Repeat(grammargen.Pat(`[A-Za-z0-9_]`)),
+		grammargen.Repeat1(grammargen.Seq(
+			grammargen.Str("-"),
+			grammargen.Pat(`[A-Za-z_]`),
+			grammargen.Repeat(grammargen.Pat(`[A-Za-z0-9_]`)),
+		)),
+	)))
 
 	// string → double-quoted string literal with simple backslash escapes.
 	g.Define("string", grammargen.Seq(

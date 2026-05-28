@@ -11,6 +11,7 @@ type Range struct {
 type Document struct {
 	Imports []*Import
 	Systems []*SystemDecl
+	Views   []*ViewDecl
 	Range   Range
 }
 
@@ -367,3 +368,101 @@ type List struct {
 }
 
 func (List) isSirenaValue() {}
+
+// ViewDecl is a view declaration: what to render and how. Views are
+// file-level (peers of Imports and Systems), not nested inside any system.
+// A view file (`*.view.sir`) typically contains one view, but the grammar
+// accepts multiple views per file so the workspace evaluator can pick the
+// named one. All directives except Name are optional; an empty body
+// (`view "small" {}`) is legal — every field stays zero/nil.
+type ViewDecl struct {
+	Name     string           // declared as STRING, e.g. "payments-data-plane"
+	Title    string           // optional; from `title:` directive
+	Preset   string           // optional; from `preset:` (IDENT)
+	Theme    string           // optional; from `theme:` (IDENT)
+	Include  []Selector       // optional; from `include:` selector list
+	Expand   []string         // optional; from `expand:` (list of element/boundary names)
+	Collapse []string         // optional; from `collapse:` (list of names)
+	Layout   *LayoutHints     // optional; from `layout { ... }` sub-block
+	Budget   *Budget          // optional; from `budget { ... }` sub-block
+	Metadata map[string]Value // unrecognized top-level view_pair keys land here
+	Range    Range
+}
+
+// Selector is one item in a view's include list. It expresses which
+// elements / boundaries / edges to project from the system into the view.
+type Selector struct {
+	Kind        SelectorKind // discriminator (boundary, element, edges in/out)
+	ElementKind ElementKind  // populated only when Kind == SelectorElement
+	Target      string       // boundary name, element name, or edge endpoint
+	Range       Range
+}
+
+// SelectorKind enumerates the selector forms allowed in a view's
+// `include:` list. The zero value SelectorUnknown is reserved so misuse
+// surfaces obviously.
+type SelectorKind int
+
+const (
+	// SelectorUnknown is the zero value; not a valid selector kind.
+	SelectorUnknown SelectorKind = iota
+	// SelectorBoundary selects a boundary by name: `boundary "pci"`.
+	SelectorBoundary
+	// SelectorElement selects an element by typed kind keyword + name,
+	// e.g. `service "auth-svc"`. The element kind is carried in
+	// Selector.ElementKind.
+	SelectorElement
+	// SelectorEdgesIncoming selects all edges flowing into a named target:
+	// `edges: incoming to "api"`.
+	SelectorEdgesIncoming
+	// SelectorEdgesOutgoing selects all edges flowing out of a named target:
+	// `edges: outgoing from "api"`.
+	SelectorEdgesOutgoing
+)
+
+// String returns the canonical source-level rendering of this selector
+// kind. Used for diagnostics and printer round-trips; the printer for
+// SelectorElement consults Selector.ElementKind to recover the element
+// keyword (e.g. "service").
+func (k SelectorKind) String() string {
+	switch k {
+	case SelectorBoundary:
+		return "boundary"
+	case SelectorElement:
+		return "element"
+	case SelectorEdgesIncoming:
+		return "edges:incoming"
+	case SelectorEdgesOutgoing:
+		return "edges:outgoing"
+	default:
+		return "unknown"
+	}
+}
+
+// LayoutHints captures the view's optional `layout { ... }` sub-block.
+// Pin maps an element / boundary name to a side keyword ("top", "bottom",
+// "left", "right"); Direction is the optional flow direction hint such as
+// "top-down" or "left-right". Unrecognized layout pair keys land in
+// Metadata so future hints round-trip without grammar changes.
+type LayoutHints struct {
+	Direction string            // optional; "top-down", "left-right", etc.
+	Pin       map[string]string // name → side
+	Metadata  map[string]Value  // unrecognized keys
+	Range     Range
+}
+
+// Budget caps view complexity. The view evaluator enforces these caps in
+// Phase 7 and the renderer refuses to draw a view that overflows them in
+// strict mode. The zero value means "no budget declared" — every cap
+// stays unenforced (a *Budget of nil on ViewDecl is the canonical "no
+// budget" signal; a non-nil *Budget with a zero field signals "this cap
+// was explicitly set to zero", which the evaluator treats as forbidding
+// anything in that category).
+type Budget struct {
+	Nodes          int
+	EdgesPerNode   int
+	Depth          int
+	BoundaryFanout int
+	LabelChars     int
+	Range          Range
+}

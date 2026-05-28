@@ -1,6 +1,7 @@
 package sirena_test
 
 import (
+	"reflect"
 	"testing"
 
 	"m31labs.dev/sirena"
@@ -434,6 +435,123 @@ service api`)
 	}
 	if len(doc.Systems) != 1 || len(doc.Systems[0].Elements) != 1 {
 		t.Errorf("Elements: %d", len(doc.Systems[0].Elements))
+	}
+}
+
+func TestParse_View_Full(t *testing.T) {
+	src := []byte(`view "payments-data-plane" {
+  title: "Payments — data plane"
+  preset: sociotechnical
+  include: [
+    boundary "pci"
+    service "auth-svc"
+    edges: incoming to "api"
+  ]
+  expand: ["pci"]
+  collapse: ["legacy-batch"]
+  theme: earth-default
+  layout {
+    direction: top-down
+    pin: { "api": top }
+  }
+  budget {
+    nodes: 30
+    edges_per_node: 6
+    depth: 4
+    boundary_fanout: 12
+    label_chars: 64
+  }
+}`)
+	doc, err := sirena.Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(doc.Views) != 1 {
+		t.Fatalf("Views: %d", len(doc.Views))
+	}
+	v := doc.Views[0]
+
+	if v.Name != "payments-data-plane" {
+		t.Errorf("Name: %q", v.Name)
+	}
+	if v.Title != "Payments — data plane" {
+		t.Errorf("Title: %q", v.Title)
+	}
+	if v.Preset != "sociotechnical" {
+		t.Errorf("Preset: %q", v.Preset)
+	}
+	if v.Theme != "earth-default" {
+		t.Errorf("Theme: %q", v.Theme)
+	}
+
+	if len(v.Include) != 3 {
+		t.Fatalf("Include: %d", len(v.Include))
+	}
+	if v.Include[0].Kind != sirena.SelectorBoundary || v.Include[0].Target != "pci" {
+		t.Errorf("Include[0]: %+v", v.Include[0])
+	}
+	if v.Include[1].Kind != sirena.SelectorElement || v.Include[1].ElementKind != sirena.ElementKindService || v.Include[1].Target != "auth-svc" {
+		t.Errorf("Include[1]: %+v", v.Include[1])
+	}
+	if v.Include[2].Kind != sirena.SelectorEdgesIncoming || v.Include[2].Target != "api" {
+		t.Errorf("Include[2]: %+v", v.Include[2])
+	}
+
+	if !reflect.DeepEqual(v.Expand, []string{"pci"}) {
+		t.Errorf("Expand: %v", v.Expand)
+	}
+	if !reflect.DeepEqual(v.Collapse, []string{"legacy-batch"}) {
+		t.Errorf("Collapse: %v", v.Collapse)
+	}
+
+	if v.Layout == nil {
+		t.Fatal("Layout nil")
+	}
+	if v.Layout.Direction != "top-down" {
+		t.Errorf("Layout.Direction: %q", v.Layout.Direction)
+	}
+	if v.Layout.Pin["api"] != "top" {
+		t.Errorf("Layout.Pin[api]: %q", v.Layout.Pin["api"])
+	}
+
+	if v.Budget == nil {
+		t.Fatal("Budget nil")
+	}
+	if v.Budget.Nodes != 30 {
+		t.Errorf("Budget.Nodes: %d", v.Budget.Nodes)
+	}
+	if v.Budget.EdgesPerNode != 6 {
+		t.Errorf("Budget.EdgesPerNode: %d", v.Budget.EdgesPerNode)
+	}
+	if v.Budget.Depth != 4 {
+		t.Errorf("Budget.Depth: %d", v.Budget.Depth)
+	}
+	if v.Budget.BoundaryFanout != 12 {
+		t.Errorf("Budget.BoundaryFanout: %d", v.Budget.BoundaryFanout)
+	}
+	if v.Budget.LabelChars != 64 {
+		t.Errorf("Budget.LabelChars: %d", v.Budget.LabelChars)
+	}
+}
+
+func TestParse_View_Minimal(t *testing.T) {
+	src := []byte(`view "small" {}`)
+	doc, err := sirena.Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(doc.Views) != 1 {
+		t.Fatalf("Views: %d", len(doc.Views))
+	}
+	v := doc.Views[0]
+	if v.Name != "small" {
+		t.Errorf("Name: %q", v.Name)
+	}
+	if v.Layout != nil {
+		t.Errorf("Layout not nil: %+v", v.Layout)
+	}
+	if v.Budget != nil {
+		t.Errorf("Budget not nil: %+v", v.Budget)
 	}
 }
 

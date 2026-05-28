@@ -131,6 +131,10 @@ func lowerDocument(root *gotreesitter.Node, lang *gotreesitter.Language, src []b
 			if e := lowerEdge(child, lang, src); e != nil {
 				sys.Edges = append(sys.Edges, e)
 			}
+		case "view_decl":
+			if v := lowerView(child, lang, src); v != nil {
+				doc.Views = append(doc.Views, v)
+			}
 		}
 	}
 
@@ -272,6 +276,355 @@ func lowerEdge(node *gotreesitter.Node, lang *gotreesitter.Language, src []byte)
 	}
 
 	return e
+}
+
+// lowerView converts a view_decl CST node into a *ViewDecl. The view
+// declaration carries a quoted Name and a `body` block whose children
+// are a mix of view_pair directives, layout_decl, and budget_decl
+// sub-blocks. Recognized directive keys land in their typed fields;
+// anything else is preserved in ViewDecl.Metadata so that future
+// additions round-trip cleanly through downstream tools that predate
+// them.
+func lowerView(node *gotreesitter.Node, lang *gotreesitter.Language, src []byte) *ViewDecl {
+	nameNode := node.ChildByFieldName("name", lang)
+	bodyNode := node.ChildByFieldName("body", lang)
+	if nameNode == nil || bodyNode == nil {
+		return nil
+	}
+
+	v := &ViewDecl{
+		Name:  decodeStringLiteral(nodeText(nameNode, src)),
+		Range: Range{Start: int(node.StartByte()), End: int(node.EndByte())},
+	}
+
+	for i := 0; i < bodyNode.NamedChildCount(); i++ {
+		child := bodyNode.NamedChild(i)
+		if child == nil {
+			continue
+		}
+		switch child.Type(lang) {
+		case "view_pair":
+			lowerViewPair(child, lang, src, v)
+		case "layout_decl":
+			if l := lowerLayoutDecl(child, lang, src); l != nil {
+				v.Layout = l
+			}
+		case "budget_decl":
+			if b := lowerBudgetDecl(child, lang, src); b != nil {
+				v.Budget = b
+			}
+		}
+	}
+
+	return v
+}
+
+// lowerViewPair dispatches a single view_pair into the appropriate field
+// of v. Pairs with keys outside the recognized set are preserved in
+// v.Metadata so that callers can round-trip forward-compatible directives
+// without losing data.
+func lowerViewPair(node *gotreesitter.Node, lang *gotreesitter.Language, src []byte, v *ViewDecl) {
+	keyNode := node.ChildByFieldName("key", lang)
+	valNode := node.ChildByFieldName("value", lang)
+	if keyNode == nil || valNode == nil {
+		return
+	}
+	key := nodeText(keyNode, src)
+
+	switch key {
+	case "title":
+		if s, ok := lowerStringScalar(valNode, src); ok {
+			v.Title = s
+		}
+	case "preset":
+		if s, ok := lowerIdentScalar(valNode, src); ok {
+			v.Preset = s
+		}
+	case "theme":
+		if s, ok := lowerIdentScalar(valNode, src); ok {
+			v.Theme = s
+		}
+	case "include":
+		if valNode.Type(lang) == "selector_list" {
+			v.Include = lowerSelectorList(valNode, lang, src)
+		}
+	case "expand":
+		if valNode.Type(lang) == "list" {
+			v.Expand = lowerNameList(valNode, lang, src)
+		}
+	case "collapse":
+		if valNode.Type(lang) == "list" {
+			v.Collapse = lowerNameList(valNode, lang, src)
+		}
+	default:
+		// Forward-compat: stash unknown view-pair keys in Metadata so
+		// downstream tools can still see the directive. lowerValue accepts
+		// the regular value shapes (string / number / identifier / list);
+		// selector_list values are intentionally ignored here — unknown
+		// pairs that carry selector lists indicate a typo'd directive name
+		// and are dropped to surface the typo via the missing field rather
+		// than smuggling selectors into Metadata.
+		if val, ok := lowerValue(valNode, lang, src); ok {
+			if v.Metadata == nil {
+				v.Metadata = make(map[string]Value)
+			}
+			v.Metadata[key] = val
+		}
+	}
+}
+
+// lowerStringScalar returns the decoded string content of a "string" CST
+// node. Returns ("", false) when node is any other type so the caller
+// can surface the type mismatch (today by silently skipping; future
+// lints will diagnose).
+func lowerStringScalar(node *gotreesitter.Node, src []byte) (string, bool) {
+	if node == nil {
+		return "", false
+	}
+	// We check the node text shape rather than calling Type because this
+	// helper is used after a known field lookup where the caller already
+	// confirmed the field exists. The leading quote is the unambiguous
+	// signal that this is a string literal.
+	t := nodeText(node, src)
+	if len(t) >= 2 && t[0] == '"' && t[len(t)-1] == '"' {
+		return decodeStringLiteral(t), true
+	}
+	return "", false
+}
+
+// lowerIdentScalar returns the lexeme of an identifier-shaped CST node.
+// Returns ("", false) when node is nil or its text is empty.
+func lowerIdentScalar(node *gotreesitter.Node, src []byte) (string, bool) {
+	if node == nil {
+		return "", false
+	}
+	t := nodeText(node, src)
+	if t == "" {
+		return "", false
+	}
+	return t, true
+}
+
+// lowerSelectorList walks a selector_list CST node and returns the
+// expanded slice of Selector values. Unknown selector subtypes (none
+// today, but the grammar may grow) are skipped silently.
+func lowerSelectorList(node *gotreesitter.Node, lang *gotreesitter.Language, src []byte) []Selector {
+	var out []Selector
+	for i := 0; i < node.NamedChildCount(); i++ {
+		child := node.NamedChild(i)
+		if child == nil {
+			continue
+		}
+		if sel, ok := lowerSelector(child, lang, src); ok {
+			out = append(out, sel)
+		}
+	}
+	return out
+}
+
+// lowerSelector converts one selector CST node into a Selector. The
+// node type discriminates among boundary_selector, element_selector,
+// and edges_selector; each populates the matching Selector fields. The
+// returned bool is false for unrecognized node types so the caller can
+// skip them.
+func lowerSelector(node *gotreesitter.Node, lang *gotreesitter.Language, src []byte) (Selector, bool) {
+	r := Range{Start: int(node.StartByte()), End: int(node.EndByte())}
+	switch node.Type(lang) {
+	case "boundary_selector":
+		target := node.ChildByFieldName("target", lang)
+		if target == nil {
+			return Selector{}, false
+		}
+		return Selector{
+			Kind:   SelectorBoundary,
+			Target: decodeStringLiteral(nodeText(target, src)),
+			Range:  r,
+		}, true
+	case "element_selector":
+		kind := node.ChildByFieldName("kind", lang)
+		target := node.ChildByFieldName("target", lang)
+		if kind == nil || target == nil {
+			return Selector{}, false
+		}
+		return Selector{
+			Kind:        SelectorElement,
+			ElementKind: elementKindForKeyword(nodeText(kind, src)),
+			Target:      decodeStringLiteral(nodeText(target, src)),
+			Range:       r,
+		}, true
+	case "edges_selector":
+		target := node.ChildByFieldName("target", lang)
+		if target == nil {
+			return Selector{}, false
+		}
+		// The `direction` field's text is the verbatim source slice
+		// covering either "incoming to" or "outgoing from" (whitespace
+		// between the keywords preserved). We discriminate on the first
+		// token; the preposition is fixed per direction by the grammar.
+		dirText := ""
+		if dirNode := node.ChildByFieldName("direction", lang); dirNode != nil {
+			dirText = nodeText(dirNode, src)
+		}
+		kind := SelectorUnknown
+		if strings.HasPrefix(dirText, "incoming") {
+			kind = SelectorEdgesIncoming
+		} else if strings.HasPrefix(dirText, "outgoing") {
+			kind = SelectorEdgesOutgoing
+		}
+		return Selector{
+			Kind:   kind,
+			Target: decodeStringLiteral(nodeText(target, src)),
+			Range:  r,
+		}, true
+	}
+	return Selector{}, false
+}
+
+// lowerNameList extracts the textual names from a value list, preserving
+// element order. STRING items are decoded; IDENT items pass through
+// verbatim. NUMBER and nested list items are skipped (they make no sense
+// in expand/collapse contexts and a Phase 10 lint will surface them).
+func lowerNameList(node *gotreesitter.Node, lang *gotreesitter.Language, src []byte) []string {
+	var out []string
+	for i := 0; i < node.NamedChildCount(); i++ {
+		child := node.NamedChild(i)
+		if child == nil {
+			continue
+		}
+		switch child.Type(lang) {
+		case "string":
+			out = append(out, decodeStringLiteral(nodeText(child, src)))
+		case "identifier":
+			out = append(out, nodeText(child, src))
+		}
+	}
+	return out
+}
+
+// lowerLayoutDecl converts a layout_decl CST node into a *LayoutHints.
+// Recognized keys ("direction", "pin") land in typed fields; everything
+// else lands in LayoutHints.Metadata to round-trip forward-compatible
+// hints through downstream tooling.
+func lowerLayoutDecl(node *gotreesitter.Node, lang *gotreesitter.Language, src []byte) *LayoutHints {
+	body := node.ChildByFieldName("body", lang)
+	if body == nil {
+		return nil
+	}
+
+	l := &LayoutHints{
+		Range: Range{Start: int(node.StartByte()), End: int(node.EndByte())},
+	}
+
+	for i := 0; i < body.NamedChildCount(); i++ {
+		child := body.NamedChild(i)
+		if child == nil || child.Type(lang) != "layout_pair" {
+			continue
+		}
+		keyNode := child.ChildByFieldName("key", lang)
+		valNode := child.ChildByFieldName("value", lang)
+		if keyNode == nil || valNode == nil {
+			continue
+		}
+		key := nodeText(keyNode, src)
+		switch key {
+		case "direction":
+			// Direction is conventionally a kebab atom ("top-down",
+			// "left-right") parsed as dashed_ident, but a plain
+			// identifier or a quoted string is accepted too so authors
+			// who quote everything still round-trip.
+			switch valNode.Type(lang) {
+			case "identifier", "dashed_ident":
+				l.Direction = nodeText(valNode, src)
+			case "string":
+				l.Direction = decodeStringLiteral(nodeText(valNode, src))
+			}
+		case "pin":
+			if valNode.Type(lang) == "pin_map" {
+				l.Pin = lowerPinMap(valNode, lang, src)
+			}
+		default:
+			if val, ok := lowerValue(valNode, lang, src); ok {
+				if l.Metadata == nil {
+					l.Metadata = make(map[string]Value)
+				}
+				l.Metadata[key] = val
+			}
+		}
+	}
+
+	return l
+}
+
+// lowerPinMap walks a pin_map CST node and returns a map of name → side.
+// Both halves of each pin_pair are required by the grammar; nil/missing
+// fields cause the pair to be skipped silently.
+func lowerPinMap(node *gotreesitter.Node, lang *gotreesitter.Language, src []byte) map[string]string {
+	out := make(map[string]string)
+	for i := 0; i < node.NamedChildCount(); i++ {
+		child := node.NamedChild(i)
+		if child == nil || child.Type(lang) != "pin_pair" {
+			continue
+		}
+		nameNode := child.ChildByFieldName("name", lang)
+		sideNode := child.ChildByFieldName("side", lang)
+		if nameNode == nil || sideNode == nil {
+			continue
+		}
+		out[decodeStringLiteral(nodeText(nameNode, src))] = nodeText(sideNode, src)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// lowerBudgetDecl converts a budget_decl CST node into a *Budget. Each
+// recognized key maps to a typed int field via strconv.ParseFloat → int
+// (the grammar permits the same number shape as metadata values, so
+// floats are accepted but truncated; Phase 10 will lint fractional
+// budget values). Unrecognized keys are dropped here — budgets have a
+// fixed schema and forward-compat for new caps will require a code
+// change anyway, so silently ignoring is preferable to smuggling typo'd
+// keys into a downstream consumer that won't enforce them.
+func lowerBudgetDecl(node *gotreesitter.Node, lang *gotreesitter.Language, src []byte) *Budget {
+	body := node.ChildByFieldName("body", lang)
+	if body == nil {
+		return nil
+	}
+
+	b := &Budget{
+		Range: Range{Start: int(node.StartByte()), End: int(node.EndByte())},
+	}
+
+	for i := 0; i < body.NamedChildCount(); i++ {
+		child := body.NamedChild(i)
+		if child == nil || child.Type(lang) != "budget_pair" {
+			continue
+		}
+		keyNode := child.ChildByFieldName("key", lang)
+		valNode := child.ChildByFieldName("value", lang)
+		if keyNode == nil || valNode == nil {
+			continue
+		}
+		n, err := strconv.ParseFloat(nodeText(valNode, src), 64)
+		if err != nil {
+			continue
+		}
+		switch nodeText(keyNode, src) {
+		case "nodes":
+			b.Nodes = int(n)
+		case "edges_per_node":
+			b.EdgesPerNode = int(n)
+		case "depth":
+			b.Depth = int(n)
+		case "boundary_fanout":
+			b.BoundaryFanout = int(n)
+		case "label_chars":
+			b.LabelChars = int(n)
+		}
+	}
+
+	return b
 }
 
 // lowerElement converts a single element_decl CST node into an *Element.
