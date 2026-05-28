@@ -190,6 +190,30 @@ func TestIR_ZeroValue(t *testing.T) {
 	if r.Start != 0 || r.End != 0 {
 		t.Errorf("Range zero = %+v, want {0 0}", r)
 	}
+
+	var diag Diagnostic
+	if diag.Code != "" || diag.Severity != SeverityError || diag.Message != "" {
+		t.Error("Diagnostic zero non-zero")
+	}
+	if diag.Range != (Range{}) {
+		t.Error("Diagnostic.Range zero not Range{}")
+	}
+}
+
+// TestIR_SeverityString pins every Severity constant to its short label.
+// SeverityError is the zero value so an empty Diagnostic prints as an error
+// — the most-urgent rendering for the most-likely-unintentional state.
+func TestIR_SeverityString(t *testing.T) {
+	cases := map[Severity]string{
+		SeverityError:   "error",
+		SeverityWarning: "warning",
+		SeverityInfo:    "info",
+	}
+	for s, want := range cases {
+		if got := s.String(); got != want {
+			t.Errorf("Severity(%d).String() = %q, want %q", s, got, want)
+		}
+	}
 }
 
 // TestIR_RangeInvariants documents the End >= Start half-open-span
