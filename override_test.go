@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/oklog/ulid/v2"
 	"m31labs.dev/sirena"
 )
 
@@ -389,5 +390,151 @@ func TestValidateOverridesAgainstWorkspace_Resolved(t *testing.T) {
 		if d.Code == "SIR-OVERRIDE-DANGLING" {
 			t.Errorf("unexpected SIR-OVERRIDE-DANGLING: %+v", d)
 		}
+	}
+}
+
+// TestReconcileWithOrphans_RetainedWithinGrace covers Task 28a: a prior
+// `.gen.sir` declared `service stale { sid:...; source_ref:... }`; the new
+// emission omits it. The resolver retains the orphan and emits a
+// SIR-ORPHAN warning so reviewers see the dropped declaration.
+func TestReconcileWithOrphans_RetainedWithinGrace(t *testing.T) {
+	// Build prior element with a known ULID timestamp (day 0).
+	day0 := time.Unix(1_700_000_000, 0)
+	sid := ulid.MustNew(ulid.Timestamp(day0), seededEntropy(1)).String()
+
+	prior := []*sirena.Element{{
+		Kind: sirena.ElementKindService, Name: "stale",
+		Metadata: map[string]sirena.Value{
+			"sid":        sirena.String{Value: sid},
+			"source_ref": sirena.String{Value: "code://go/foo#Stale"},
+		},
+	}}
+	newEls := []*sirena.Element{} // nothing matches
+
+	// Now is day 5 — within 14-day grace.
+	day5 := day0.Add(5 * 24 * time.Hour)
+	result := sirena.ReconcileWithOrphans(prior, newEls, sirena.ReconcileOptions{
+		EmissionOptions: sirena.EmissionOptions{Clock: func() time.Time { return day5 }},
+	})
+
+	if len(result.Orphans) != 1 {
+		t.Fatalf("Orphans: %d", len(result.Orphans))
+	}
+	if result.Orphans[0].Status != sirena.OrphanRetained {
+		t.Errorf("Status: %v", result.Orphans[0].Status)
+	}
+	var hasOrphan bool
+	for _, d := range result.Diagnostics {
+		if d.Code == "SIR-ORPHAN" {
+			hasOrphan = true
+		}
+	}
+	if !hasOrphan {
+		t.Errorf("expected SIR-ORPHAN; got %+v", result.Diagnostics)
+	}
+}
+
+// TestReconcileWithOrphans_DeletedPastGrace covers Task 28b: a prior
+// orphan whose ULID timestamp is older than the 14-day default grace is
+// dropped silently — past the grace window the generator's intentional
+// removal wins and the diagnostic stops firing.
+func TestReconcileWithOrphans_DeletedPastGrace(t *testing.T) {
+	day0 := time.Unix(1_700_000_000, 0)
+	sid := ulid.MustNew(ulid.Timestamp(day0), seededEntropy(2)).String()
+
+	prior := []*sirena.Element{{
+		Kind: sirena.ElementKindService, Name: "stale",
+		Metadata: map[string]sirena.Value{"sid": sirena.String{Value: sid}},
+	}}
+	newEls := []*sirena.Element{}
+
+	// Now is day 15 — past 14-day grace.
+	day15 := day0.Add(15 * 24 * time.Hour)
+	result := sirena.ReconcileWithOrphans(prior, newEls, sirena.ReconcileOptions{
+		EmissionOptions: sirena.EmissionOptions{Clock: func() time.Time { return day15 }},
+	})
+
+	if len(result.Orphans) != 1 {
+		t.Fatalf("Orphans: %d", len(result.Orphans))
+	}
+	if result.Orphans[0].Status != sirena.OrphanDeleted {
+		t.Errorf("Status: %v", result.Orphans[0].Status)
+	}
+	for _, d := range result.Diagnostics {
+		if d.Code == "SIR-ORPHAN" {
+			t.Errorf("deleted orphans should not emit SIR-ORPHAN; got %+v", d)
+		}
+	}
+}
+
+// TestReconcileWithOrphans_ConfigurableGrace covers Task 28c: callers can
+// shorten the grace period via OverrideOptions. Under a 24-hour grace, a
+// day-2 orphan is past grace and gets dropped.
+func TestReconcileWithOrphans_ConfigurableGrace(t *testing.T) {
+	day0 := time.Unix(1_700_000_000, 0)
+	sid := ulid.MustNew(ulid.Timestamp(day0), seededEntropy(3)).String()
+
+	prior := []*sirena.Element{{
+		Kind: sirena.ElementKindService, Name: "stale",
+		Metadata: map[string]sirena.Value{"sid": sirena.String{Value: sid}},
+	}}
+	newEls := []*sirena.Element{}
+
+	// 24-hour grace; check day 2.
+	day2 := day0.Add(2 * 24 * time.Hour)
+	result := sirena.ReconcileWithOrphans(prior, newEls, sirena.ReconcileOptions{
+		EmissionOptions:   sirena.EmissionOptions{Clock: func() time.Time { return day2 }},
+		OrphanGracePeriod: 24 * time.Hour,
+	})
+
+	if len(result.Orphans) != 1 {
+		t.Fatalf("Orphans: %d", len(result.Orphans))
+	}
+	if result.Orphans[0].Status != sirena.OrphanDeleted {
+		t.Errorf("expected deleted under 24h grace; got %v", result.Orphans[0].Status)
+	}
+}
+
+// TestReconcileWithOrphans_NoOrphansWhenAllMatched is the negative twin:
+// every prior element matches a new one, so the Orphans slice stays empty
+// and no SIR-ORPHAN diagnostic surfaces.
+func TestReconcileWithOrphans_NoOrphansWhenAllMatched(t *testing.T) {
+	sid := ulid.MustNew(ulid.Timestamp(time.Unix(1_700_000_000, 0)), seededEntropy(4)).String()
+	prior := []*sirena.Element{{
+		Kind: sirena.ElementKindService, Name: "api",
+		Metadata: map[string]sirena.Value{
+			"sid":        sirena.String{Value: sid},
+			"source_ref": sirena.String{Value: "code://go/foo#A"},
+		},
+	}}
+	newEls := []*sirena.Element{{
+		Kind: sirena.ElementKindService, Name: "api",
+		Metadata: map[string]sirena.Value{
+			"sid":        sirena.String{Value: sid},
+			"source_ref": sirena.String{Value: "code://go/foo#A"},
+		},
+	}}
+	result := sirena.ReconcileWithOrphans(prior, newEls, sirena.ReconcileOptions{})
+	if len(result.Orphans) != 0 {
+		t.Errorf("Orphans should be empty: %+v", result.Orphans)
+	}
+}
+
+// TestReconcileWithOrphans_MissingSidGetsFullGrace pins the missing-sid
+// fallback: when a prior orphan has no `sid:` metadata (or a malformed
+// one), the resolver treats FirstSeen as the current clock and grants the
+// full grace window. The orphan surfaces as Retained.
+func TestReconcileWithOrphans_MissingSidGetsFullGrace(t *testing.T) {
+	prior := []*sirena.Element{{
+		Kind: sirena.ElementKindService, Name: "stale",
+		Metadata: map[string]sirena.Value{"source_ref": sirena.String{Value: "x"}},
+	}}
+	newEls := []*sirena.Element{}
+	result := sirena.ReconcileWithOrphans(prior, newEls, sirena.ReconcileOptions{})
+	if len(result.Orphans) != 1 {
+		t.Fatalf("Orphans: %d", len(result.Orphans))
+	}
+	if result.Orphans[0].Status != sirena.OrphanRetained {
+		t.Errorf("missing sid should yield retained: %v", result.Orphans[0].Status)
 	}
 }

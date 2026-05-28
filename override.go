@@ -375,6 +375,202 @@ func metaString(md map[string]Value, key string) string {
 	return s.Value
 }
 
+// ReconcileOptions extends EmissionOptions with policy knobs for the
+// orphan-handling logic.
+//
+// The grace period exists because round-trip identity is a co-edit
+// contract: the generator says "this declaration is gone", but the human
+// reviewer may want a warning window before the historical declaration
+// silently disappears. Two regenerations in close succession (e.g. a
+// rebase that drops then re-adds the same code) should not lose the prior
+// sid. Past the grace period, the generator's intent wins.
+type ReconcileOptions struct {
+	EmissionOptions
+	// OrphanGracePeriod is how long an orphan (a prior element whose
+	// identity does NOT match any element in the new emission) is retained
+	// in the result before being dropped. When zero, defaults to 14 days.
+	OrphanGracePeriod time.Duration
+}
+
+// ReconcileResult is the full output of ReconcileWithOrphans. It carries
+// the per-new-element resolutions (same shape as Reconcile) plus the
+// orphans surfaced from the prior set and any diagnostics raised during
+// reconciliation.
+type ReconcileResult struct {
+	// Resolutions is one entry per element in newElements, mirroring the
+	// shape of Reconcile's return value.
+	Resolutions []IdentityResolution
+	// Orphans is one entry per prior element with no matching resolution,
+	// each tagged with a Retained/Deleted status decided by the grace
+	// period.
+	Orphans []OrphanRecord
+	// Diagnostics collects SIR-ORPHAN warnings for retained orphans.
+	// Deleted orphans emit no diagnostic — they're dropped silently as the
+	// generator's intentional removal.
+	Diagnostics []Diagnostic
+}
+
+// OrphanRecord describes a prior element that does not match any new
+// element in the current emission. Generators use the Status to decide
+// whether to keep emitting the orphan (Retained) or drop it on the next
+// write (Deleted).
+type OrphanRecord struct {
+	// Element is a pointer to the prior element. The pointer is borrowed
+	// from priorElements and is never mutated by ReconcileWithOrphans.
+	Element *Element
+	// Status is Retained when the orphan is still within its grace window
+	// and Deleted once the window has elapsed.
+	Status OrphanStatus
+	// FirstSeen is the moment the orphan first appeared, decoded from its
+	// sid's ULID timestamp. When the sid is missing or malformed, FirstSeen
+	// falls back to the resolver's clock so the orphan gets the full grace
+	// window.
+	FirstSeen time.Time
+	// Reason is a free-form short tag identifying why the prior element
+	// became an orphan. Reserved for future explain pipelines.
+	Reason string
+}
+
+// OrphanStatus discriminates an orphan's lifecycle stage. The zero value
+// is OrphanRetained so an unset status surfaces as a kept-in-place orphan
+// rather than as a silent deletion.
+type OrphanStatus int
+
+const (
+	// OrphanRetained marks an orphan still within its grace window. The
+	// generator should keep emitting it and the resolver emits a
+	// SIR-ORPHAN warning so reviewers see the dropped declaration.
+	OrphanRetained OrphanStatus = iota
+	// OrphanDeleted marks an orphan past its grace window. The generator
+	// should drop it on the next write and the resolver emits no
+	// diagnostic — the generator's intentional removal wins.
+	OrphanDeleted
+)
+
+// String returns the short label for this status, suitable for diagnostic
+// rendering and explain output.
+func (s OrphanStatus) String() string {
+	switch s {
+	case OrphanRetained:
+		return "retained"
+	case OrphanDeleted:
+		return "deleted"
+	default:
+		return "unknown"
+	}
+}
+
+// defaultOrphanGracePeriod is the grace window applied when
+// ReconcileOptions.OrphanGracePeriod is zero. 14 days balances "two-week
+// review cycle" with "don't keep orphans forever".
+const defaultOrphanGracePeriod = 14 * 24 * time.Hour
+
+// ReconcileWithOrphans extends Reconcile with orphan handling.
+//
+// It first delegates to Reconcile to match the new emission against the
+// prior set. It then walks priorElements; for each prior whose sid was
+// not carried forward into any resolution, it classifies the prior as an
+// orphan, decides Retained vs Deleted from the orphan's ULID timestamp
+// and the configured grace period, and (for Retained orphans only)
+// appends a SIR-ORPHAN warning to the diagnostic list.
+//
+// Deleted orphans get no diagnostic — they are dropped silently as the
+// generator's intentional removal.
+//
+// When opts.OrphanGracePeriod is zero, the default of 14 days applies.
+// The clock comes from opts.EmissionOptions.Clock; when nil, time.Now.
+func ReconcileWithOrphans(priorElements, newElements []*Element, opts ReconcileOptions) ReconcileResult {
+	resolutions := Reconcile(priorElements, newElements, opts.EmissionOptions)
+
+	grace := opts.OrphanGracePeriod
+	if grace == 0 {
+		grace = defaultOrphanGracePeriod
+	}
+	clock := opts.Clock
+	if clock == nil {
+		clock = time.Now
+	}
+	now := clock()
+
+	// Build the set of prior sids that survived as carried-forward identity.
+	// Reconcile's precedence guarantees each prior contributes its sid at
+	// most once: either via IdentityMatchBySID (direct carry) or via
+	// IdentityMatchBySourceRef/Fuzzy where the resolution's SID is the
+	// prior's sid. IdentityMatchNew carries the new element's own sid.
+	carried := make(map[string]bool, len(resolutions))
+	for _, res := range resolutions {
+		if res.MatchedVia == IdentityMatchNew {
+			continue
+		}
+		// The resolution's SID is the prior sid carried forward (Reconcile
+		// pulls it from the matched prior). IdentityMatchNew is skipped
+		// above so we don't accidentally treat a new element's own sid as
+		// a claim on a prior identity.
+		if res.SID != "" {
+			carried[res.SID] = true
+		}
+	}
+
+	var (
+		orphans []OrphanRecord
+		diags   []Diagnostic
+	)
+	for _, p := range priorElements {
+		if p == nil {
+			continue
+		}
+		priorSID := metaString(p.Metadata, "sid")
+		if priorSID != "" && carried[priorSID] {
+			continue
+		}
+		// Prior with no sid: still an orphan candidate. Distinguish via the
+		// fallback below.
+		firstSeen, ok := ulidTimestamp(priorSID)
+		if !ok {
+			firstSeen = now
+		}
+		age := now.Sub(firstSeen)
+		status := OrphanRetained
+		if age > grace {
+			status = OrphanDeleted
+		}
+		orphans = append(orphans, OrphanRecord{
+			Element:   p,
+			Status:    status,
+			FirstSeen: firstSeen,
+		})
+		if status == OrphanRetained {
+			diags = append(diags, Diagnostic{
+				Code:     "SIR-ORPHAN",
+				Severity: SeverityWarning,
+				Message:  fmt.Sprintf("orphan %q retained within grace period; remove from .gen.sir or wait for grace to elapse", p.Name),
+				Range:    p.Range,
+			})
+		}
+	}
+
+	return ReconcileResult{
+		Resolutions: resolutions,
+		Orphans:     orphans,
+		Diagnostics: diags,
+	}
+}
+
+// ulidTimestamp extracts the ULID's encoded millisecond timestamp and
+// converts it back to a time.Time. Returns ok=false when sid is empty or
+// fails strict ULID parsing — callers should fall back to the resolver's
+// clock.
+func ulidTimestamp(sid string) (time.Time, bool) {
+	if sid == "" {
+		return time.Time{}, false
+	}
+	parsed, err := ulid.ParseStrict(sid)
+	if err != nil {
+		return time.Time{}, false
+	}
+	return ulid.Time(parsed.Time()), true
+}
+
 // MergeOverride applies a hand-authored override declaration's policy
 // against the generator-emitted twin. The two inputs are read-only; the
 // returned *Element has a freshly-allocated Metadata map and inherits

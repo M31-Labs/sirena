@@ -312,6 +312,41 @@ func TestIR_ZeroValue(t *testing.T) {
 	if im != IdentityMatchNew {
 		t.Errorf("IdentityMatch zero = %v, want IdentityMatchNew", im)
 	}
+
+	var ro2 ReconcileOptions
+	if ro2.Clock != nil || ro2.Entropy != nil || ro2.OrphanGracePeriod != 0 {
+		t.Errorf("ReconcileOptions zero non-zero: %+v", ro2)
+	}
+
+	var rr ReconcileResult
+	if rr.Resolutions != nil || rr.Orphans != nil || rr.Diagnostics != nil {
+		t.Errorf("ReconcileResult zero non-zero: %+v", rr)
+	}
+
+	var or OrphanRecord
+	if or.Element != nil || or.Status != OrphanRetained || !or.FirstSeen.IsZero() || or.Reason != "" {
+		t.Errorf("OrphanRecord zero non-zero: %+v", or)
+	}
+
+	var os OrphanStatus
+	if os != OrphanRetained {
+		t.Errorf("OrphanStatus zero = %v, want OrphanRetained", os)
+	}
+}
+
+// TestIR_OrphanStatusString pins every OrphanStatus constant to its short
+// diagnostic label. OrphanRetained is the zero value so an unset status
+// surfaces as a kept-in-place orphan rather than as a silent deletion.
+func TestIR_OrphanStatusString(t *testing.T) {
+	cases := map[OrphanStatus]string{
+		OrphanRetained: "retained",
+		OrphanDeleted:  "deleted",
+	}
+	for s, want := range cases {
+		if got := s.String(); got != want {
+			t.Errorf("OrphanStatus(%d).String() = %q, want %q", s, got, want)
+		}
+	}
 }
 
 // TestIR_IdentityMatchString pins every IdentityMatch constant to its
