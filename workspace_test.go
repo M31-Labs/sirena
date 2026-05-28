@@ -176,6 +176,146 @@ func TestOpenWorkspace_LoadDocument(t *testing.T) {
 	}
 }
 
+// TestNewFenceWorkspace_SelfContained drives the headline self-contained
+// fence path: a ````sirena` block with no host workspace turns
+// into a single-file Workspace tagged ModeSelfContained, with one synthetic
+// WorkspaceFile of FileKindSystem and a working bare-name resolver.
+func TestNewFenceWorkspace_SelfContained(t *testing.T) {
+	src := []byte(`service api
+database db`)
+	ws, err := sirena.NewFenceWorkspace(src, sirena.FenceOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ws.Mode != sirena.ModeSelfContained {
+		t.Errorf("Mode: %v, want ModeSelfContained", ws.Mode)
+	}
+	if len(ws.Files) != 1 {
+		t.Fatalf("Files: %d", len(ws.Files))
+	}
+	if ws.Files[0].Kind != sirena.FileKindSystem {
+		t.Errorf("Kind: %v", ws.Files[0].Kind)
+	}
+	if ws.Resolve("api") == nil {
+		t.Error("api unresolved")
+	}
+}
+
+// TestNewFenceWorkspace_SelfContained_RejectsImports confirms a fence with
+// no host workspace surfaces SIR-IMPORT-IN-FENCE diagnostics rather than
+// silently treating the imports as no-ops. Imports inside a self-contained
+// fence have no destination to resolve against — they're an authoring
+// mistake and must be loud.
+func TestNewFenceWorkspace_SelfContained_RejectsImports(t *testing.T) {
+	src := []byte(`import "../shared/platform.sir"
+service api`)
+	ws, err := sirena.NewFenceWorkspace(src, sirena.FenceOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var found bool
+	for _, d := range ws.ResolveDiagnostics() {
+		if d.Code == "SIR-IMPORT-IN-FENCE" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected SIR-IMPORT-IN-FENCE; got %+v", ws.ResolveDiagnostics())
+	}
+}
+
+// TestNewFenceWorkspace_WorkspaceResolving_ChainsToHost drives the
+// workspace-resolving fence path: when opts.WorkspaceRoot is non-empty the
+// fence's resolver chains through the host workspace's symbol table.
+// Bare names declared locally in the fence resolve to the fence; bare and
+// namespaced names declared in the host resolve through the chained
+// lookup.
+func TestNewFenceWorkspace_WorkspaceResolving_ChainsToHost(t *testing.T) {
+	hostRoot := fixtureWorkspace(t, map[string]string{
+		"shared/platform.sir": `service kafka`,
+	})
+	src := []byte(`import "shared/platform.sir"
+service api
+api -> platform.kafka: publishes`)
+	ws, err := sirena.NewFenceWorkspace(src, sirena.FenceOptions{
+		WorkspaceRoot: hostRoot,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ws.Mode != sirena.ModeWorkspaceResolving {
+		t.Errorf("Mode: %v", ws.Mode)
+	}
+	if ws.Resolve("api") == nil {
+		t.Error("api (local) unresolved")
+	}
+	if ws.Resolve("kafka") == nil {
+		t.Error("kafka (host) unresolved")
+	}
+	if ws.Resolve("platform.kafka") == nil {
+		t.Error("platform.kafka (namespaced via host) unresolved")
+	}
+}
+
+// TestNewFenceWorkspace_ViewRef drives the ViewRef path: when opts.ViewRef
+// is set the synthesized workspace's single file is the named view file
+// from the host workspace. The fence body itself may be empty; the view's
+// content drives rendering.
+func TestNewFenceWorkspace_ViewRef(t *testing.T) {
+	hostRoot := fixtureWorkspace(t, map[string]string{
+		"diagrams/main.view.sir": `view "main" {
+  title: "Main"
+  preset: default
+}`,
+	})
+	ws, err := sirena.NewFenceWorkspace(nil, sirena.FenceOptions{
+		WorkspaceRoot: hostRoot,
+		ViewRef:       "diagrams/main.view.sir",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ws.Mode != sirena.ModeWorkspaceResolving {
+		t.Errorf("Mode: %v", ws.Mode)
+	}
+	if len(ws.Files) != 1 {
+		t.Fatalf("Files: %d", len(ws.Files))
+	}
+	if ws.Files[0].Kind != sirena.FileKindView {
+		t.Errorf("Kind: %v", ws.Files[0].Kind)
+	}
+
+	// Load the view doc and confirm the view is parsed.
+	doc, err := ws.LoadDocument(ws.Files[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(doc.Views) != 1 {
+		t.Errorf("Views: %d", len(doc.Views))
+	}
+	if doc.Views[0].Name != "main" {
+		t.Errorf("View name: %q", doc.Views[0].Name)
+	}
+}
+
+// TestNewFenceWorkspace_ViewRef_NotFound asserts an unresolved ViewRef
+// surfaces as an error from NewFenceWorkspace. A missing view file is a
+// configuration mistake and must fail loudly at construction time rather
+// than producing a workspace whose only file silently fails to load.
+func TestNewFenceWorkspace_ViewRef_NotFound(t *testing.T) {
+	hostRoot := fixtureWorkspace(t, map[string]string{
+		"other.sir": `service x`,
+	})
+	_, err := sirena.NewFenceWorkspace(nil, sirena.FenceOptions{
+		WorkspaceRoot: hostRoot,
+		ViewRef:       "diagrams/missing.view.sir",
+	})
+	if err == nil {
+		t.Error("expected error for missing ViewRef")
+	}
+}
+
 // TestOpenWorkspace_DeterministicFileOrder pins the Files slice to
 // lexicographic RelPath order. Stable ordering matters for diagnostic
 // output and for tests that assert a Workspace shape.

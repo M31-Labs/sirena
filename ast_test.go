@@ -217,6 +217,11 @@ func TestIR_ZeroValue(t *testing.T) {
 	if s.Node != nil || s.File != nil || s.QualifiedName != "" {
 		t.Error("Symbol zero non-zero")
 	}
+
+	var fo FenceOptions
+	if fo.WorkspaceRoot != "" || fo.ViewRef != "" {
+		t.Error("FenceOptions zero non-zero")
+	}
 }
 
 // TestIR_WorkspaceModeString pins every WorkspaceMode constant to its

@@ -119,30 +119,45 @@ func (ws *Workspace) Resolve(qualifiedName string) *Symbol {
 	// ("ns.name") forms. Boundary form is keyed inside each file's
 	// perFile map; namespace form routes through ws.symbols.namespaces.
 	dot := strings.IndexByte(qualifiedName, '.')
-	if dot <= 0 || dot == len(qualifiedName)-1 {
-		return nil
-	}
-
-	// Boundary-qualified: scan every file's perFile map for the full
-	// "outer.inner" key. This is O(files) but only kicks in when the
-	// bare lookup missed.
-	for _, m := range ws.symbols.perFile {
-		if s, ok := m[qualifiedName]; ok {
-			return s
-		}
-	}
-
-	// Namespaced: split on the first dot and look up the second half in
-	// the namespaced file's per-file map. The bare name inside the
-	// imported file is the lookup key, NOT the qualified form.
-	ns := qualifiedName[:dot]
-	rest := qualifiedName[dot+1:]
-	if nsFile, ok := ws.symbols.namespaces[ns]; ok {
-		if m, ok := ws.symbols.perFile[nsFile]; ok {
-			if s, ok := m[rest]; ok {
+	if dot > 0 && dot < len(qualifiedName)-1 {
+		// Boundary-qualified: scan every file's perFile map for the full
+		// "outer.inner" key. This is O(files) but only kicks in when the
+		// bare lookup missed.
+		for _, m := range ws.symbols.perFile {
+			if s, ok := m[qualifiedName]; ok {
 				return s
 			}
 		}
+
+		// Namespaced: split on the first dot and look up the second half
+		// in the namespaced file's per-file map. The bare name inside the
+		// imported file is the lookup key, NOT the qualified form. For
+		// workspace-resolving fences the namespace points at a host file
+		// not in our own perFile; consult the host's index in that case.
+		ns := qualifiedName[:dot]
+		rest := qualifiedName[dot+1:]
+		if nsFile, ok := ws.symbols.namespaces[ns]; ok {
+			if m, ok := ws.symbols.perFile[nsFile]; ok {
+				if s, ok := m[rest]; ok {
+					return s
+				}
+			}
+			if ws.host != nil {
+				ws.host.ensureIndexed()
+				if m, ok := ws.host.symbols.perFile[nsFile]; ok {
+					if s, ok := m[rest]; ok {
+						return s
+					}
+				}
+			}
+		}
+	}
+
+	// Workspace-resolving fence: chain to the host workspace for any name
+	// the fence's own index couldn't satisfy. The host's lazy index builds
+	// on first use, so a fence that never misses pays no host-walk cost.
+	if ws.host != nil {
+		return ws.host.Resolve(qualifiedName)
 	}
 	return nil
 }
@@ -150,11 +165,18 @@ func (ws *Workspace) Resolve(qualifiedName string) *Symbol {
 // ResolveDiagnostics returns the set of resolution diagnostics gathered
 // during the most recent workspace-wide index build. v0.1 emits
 // SIR-IMPORT-UNRESOLVED entries; later tasks add SIR-REF-UNRESOLVED for
-// unresolved edge targets and similar.
+// unresolved edge targets and similar. Synthesized fence workspaces also
+// surface SIR-IMPORT-IN-FENCE entries gathered at construction time, plus
+// the host workspace's diagnostics when chained through a workspace-
+// resolving fence.
 func (ws *Workspace) ResolveDiagnostics() []Diagnostic {
 	ws.ensureIndexed()
-	out := make([]Diagnostic, len(ws.symbols.diagnostics))
-	copy(out, ws.symbols.diagnostics)
+	out := make([]Diagnostic, 0, len(ws.symbols.diagnostics)+len(ws.synthDiagnostics))
+	out = append(out, ws.synthDiagnostics...)
+	out = append(out, ws.symbols.diagnostics...)
+	if ws.host != nil {
+		out = append(out, ws.host.ResolveDiagnostics()...)
+	}
 	return out
 }
 
@@ -323,6 +345,13 @@ func (ws *Workspace) ensureIndexed() {
 			// shadow it through the namespace map.
 			continue
 		}
+		// Synthesized fence files come with a pre-populated Document and a
+		// pseudo path that os.ReadFile can't resolve. Index them directly
+		// and skip the fingerprint (Touch is a no-op for fences anyway).
+		if f.Document != nil {
+			ws.indexFile(f, f.Document)
+			continue
+		}
 		src, err := os.ReadFile(f.Path)
 		if err != nil {
 			continue
@@ -338,7 +367,48 @@ func (ws *Workspace) ensureIndexed() {
 
 	// Second pass: resolve imports. We do this after the first pass so
 	// import targets can themselves be already-indexed files regardless
-	// of walk order.
+	// of walk order. Self-contained fences skip this pass entirely —
+	// their imports are already surfaced as SIR-IMPORT-IN-FENCE in
+	// synthDiagnostics, and there's no host workspace to resolve against.
+	if ws.Mode == ModeSelfContained {
+		return
+	}
+	// Workspace-resolving fences run a tailored variant of this pass: the
+	// fence's imports route into the host workspace's files (the fence's
+	// own Files slice contains only the synthetic <fence> entry).
+	// resolveImportPath can't help here because it scans ws.Files; we use
+	// the dedicated chained variant instead.
+	if ws.Mode == ModeWorkspaceResolving && ws.host != nil {
+		for _, f := range ws.Files {
+			if f.Document == nil {
+				continue
+			}
+			for _, imp := range f.Document.Imports {
+				target := resolveFenceImport(ws.host, imp.Path)
+				if target == nil {
+					ws.symbols.diagnostics = append(ws.symbols.diagnostics, Diagnostic{
+						Code:     "SIR-IMPORT-UNRESOLVED",
+						Severity: SeverityError,
+						Message:  fmt.Sprintf("import %q from fence does not resolve to a workspace file", imp.Path),
+						Range:    imp.Range,
+					})
+					continue
+				}
+				ns := namespaceForPath(imp.Path)
+				if ns == "" {
+					continue
+				}
+				// Make sure the host has the target file indexed before we
+				// stitch the namespace into the fence's lookup table —
+				// ensureIndexed walks the host's Files lazily on first
+				// Resolve, but we want a chained lookup against perFile to
+				// see entries from the very first call.
+				ws.host.ensureIndexed()
+				ws.symbols.namespaces[ns] = target
+			}
+		}
+		return
+	}
 	for _, f := range ws.Files {
 		if f.Document == nil {
 			continue
@@ -360,6 +430,35 @@ func (ws *Workspace) ensureIndexed() {
 			}
 		}
 	}
+}
+
+// resolveFenceImport maps a fence import path to a host workspace file.
+// Fence imports are interpreted relative to host.Root (the fence has no
+// directory of its own), or as absolute paths under host.Root. Returns
+// nil when no host file matches.
+func resolveFenceImport(host *Workspace, importPath string) *WorkspaceFile {
+	if host == nil || importPath == "" {
+		return nil
+	}
+	var candidate string
+	if filepath.IsAbs(importPath) {
+		rel, err := filepath.Rel(host.Root, importPath)
+		if err != nil || strings.HasPrefix(rel, "..") {
+			return nil
+		}
+		candidate = filepath.ToSlash(rel)
+	} else {
+		candidate = path.Clean(importPath)
+		if strings.HasPrefix(candidate, "..") {
+			return nil
+		}
+	}
+	for _, f := range host.Files {
+		if f.RelPath == candidate {
+			return f
+		}
+	}
+	return nil
 }
 
 // indexFile merges f's per-file symbol map into the workspace-level

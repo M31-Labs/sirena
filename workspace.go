@@ -171,6 +171,153 @@ type Workspace struct {
 	// the first Resolve / ResolveDiagnostics / Touch call. See resolve.go
 	// for the indexing strategy.
 	symbols *symbolTable
+	// host is the parent workspace consulted on resolver misses, populated
+	// for ModeWorkspaceResolving fences synthesized by NewFenceWorkspace.
+	// Nil for ModeStandalone and ModeSelfContained workspaces.
+	host *Workspace
+	// synthDiagnostics holds construction-time findings for synthesized
+	// workspaces — currently SIR-IMPORT-IN-FENCE entries gathered when a
+	// self-contained fence body declares an import. Surfaced through
+	// ResolveDiagnostics alongside the lazy index-build diagnostics.
+	synthDiagnostics []Diagnostic
+}
+
+// FenceOptions configures a synthesized workspace constructed by
+// NewFenceWorkspace. The fields mirror the spec's FenceOptions surface so
+// Plan 5's mdpp integration can pass them through unchanged.
+type FenceOptions struct {
+	// WorkspaceRoot, if non-empty, names a sirena workspace whose symbol
+	// table the fence's resolver chains into. When empty, the fence is
+	// self-contained and imports are rejected.
+	WorkspaceRoot string
+	// ViewRef, if non-empty, indicates the fence body is empty and the
+	// synthesized workspace should expose the named view from the host
+	// workspace. ViewRef is a path relative to WorkspaceRoot (or absolute);
+	// NewFenceWorkspace walks the host workspace to find a matching file.
+	ViewRef string
+}
+
+// NewFenceWorkspace synthesizes a workspace from a single source body
+// (typically the body of an mdpp ```sirena fence). The mode is determined
+// by opts.WorkspaceRoot:
+//
+//   - empty: ModeSelfContained — no imports allowed.
+//   - non-empty: ModeWorkspaceResolving — resolution chains through the
+//     workspace rooted at opts.WorkspaceRoot.
+//
+// The returned Workspace's Files slice contains a single synthetic
+// WorkspaceFile with Path == "<fence>", RelPath == "<fence>", and Kind ==
+// FileKindView when opts.ViewRef != "", FileKindSystem otherwise.
+//
+// Imports declared in the body of a self-contained fence surface as
+// SIR-IMPORT-IN-FENCE diagnostics (severity Error). For workspace-resolving
+// fences, imports flow through the host workspace's normal resolver path.
+//
+// If opts.ViewRef is set, src may be empty; the fence delegates to the
+// host workspace to load the referenced view file. A missing ViewRef
+// target surfaces as an error from NewFenceWorkspace itself rather than as
+// a deferred load failure.
+func NewFenceWorkspace(src []byte, opts FenceOptions) (*Workspace, error) {
+	// ViewRef path: open host, locate the referenced file, attach as the
+	// single synthetic WorkspaceFile. The fence body itself (src) is
+	// ignored — the view file's parsed content drives downstream work.
+	if opts.ViewRef != "" {
+		if opts.WorkspaceRoot == "" {
+			return nil, fmt.Errorf("sirena: NewFenceWorkspace: ViewRef requires WorkspaceRoot")
+		}
+		host, err := OpenWorkspace(opts.WorkspaceRoot)
+		if err != nil {
+			return nil, fmt.Errorf("sirena: NewFenceWorkspace: open host: %w", err)
+		}
+		viewFile := findHostFile(host, opts.ViewRef)
+		if viewFile == nil {
+			return nil, fmt.Errorf("sirena: NewFenceWorkspace: view %q not found in workspace %s", opts.ViewRef, host.Root)
+		}
+		ws := &Workspace{
+			Mode:     ModeWorkspaceResolving,
+			Manifest: host.Manifest,
+			Files: []*WorkspaceFile{
+				{
+					Path:    viewFile.Path,
+					RelPath: viewFile.RelPath,
+					Kind:    FileKindView,
+				},
+			},
+			host: host,
+		}
+		return ws, nil
+	}
+
+	// No ViewRef: parse the fence body and treat it as a synthetic system
+	// file. WorkspaceRoot decides whether the fence is self-contained or
+	// chains into a host workspace.
+	doc, err := Parse(src)
+	if err != nil {
+		return nil, fmt.Errorf("sirena: NewFenceWorkspace: parse fence: %w", err)
+	}
+
+	file := &WorkspaceFile{
+		Path:     "<fence>",
+		RelPath:  "<fence>",
+		Kind:     FileKindSystem,
+		Document: doc,
+	}
+	ws := &Workspace{
+		Files: []*WorkspaceFile{file},
+	}
+
+	if opts.WorkspaceRoot == "" {
+		ws.Mode = ModeSelfContained
+		// Self-contained: imports are an authoring mistake. Surface each
+		// one as a SIR-IMPORT-IN-FENCE error so the fence author sees it
+		// in the same channel as other resolution diagnostics.
+		for _, imp := range doc.Imports {
+			ws.synthDiagnostics = append(ws.synthDiagnostics, Diagnostic{
+				Code:     "SIR-IMPORT-IN-FENCE",
+				Severity: SeverityError,
+				Message:  fmt.Sprintf("imports are not allowed in self-contained fences: %q", imp.Path),
+				Range:    imp.Range,
+			})
+		}
+		return ws, nil
+	}
+
+	host, err := OpenWorkspace(opts.WorkspaceRoot)
+	if err != nil {
+		return nil, fmt.Errorf("sirena: NewFenceWorkspace: open host: %w", err)
+	}
+	ws.Mode = ModeWorkspaceResolving
+	ws.Manifest = host.Manifest
+	ws.host = host
+	// Propagate the host's manifest to the fence's parsed document so view
+	// evaluation downstream sees consistent defaults (mirrors the work
+	// LoadDocument does for disk-walked workspaces).
+	doc.Manifest = host.Manifest
+	return ws, nil
+}
+
+// findHostFile returns the WorkspaceFile inside host matching the given
+// reference, which may be a host-relative path (preferred form) or an
+// absolute path under host.Root. Returns nil if no file matches.
+func findHostFile(host *Workspace, ref string) *WorkspaceFile {
+	if host == nil || ref == "" {
+		return nil
+	}
+	candidate := ref
+	if filepath.IsAbs(ref) {
+		rel, err := filepath.Rel(host.Root, ref)
+		if err != nil || strings.HasPrefix(rel, "..") {
+			return nil
+		}
+		candidate = filepath.ToSlash(rel)
+	}
+	candidate = filepath.ToSlash(candidate)
+	for _, f := range host.Files {
+		if f.RelPath == candidate {
+			return f
+		}
+	}
+	return nil
 }
 
 // OpenWorkspace walks root for `.sir`, `.view.sir`, `.gen.sir` files and
