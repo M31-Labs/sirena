@@ -27,4 +27,4 @@ Re-runs the sirena binary against every case's `input.sir` and overwrites the go
 
 ## Runner
 
-`_runner_test.go` enumerates cases and asserts each case's goldens match the current implementation. Cases with no goldens are SKIPped (used during early plan development).
+`conformance_test.go` (at the repo root, package `sirena_test`) enumerates cases and asserts each case's goldens match the current implementation. Cases with no goldens are SKIPped (used during early plan development).
