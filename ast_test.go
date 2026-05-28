@@ -297,6 +297,38 @@ func TestIR_ZeroValue(t *testing.T) {
 	if lr.View != nil {
 		t.Error("LayoutResult.View zero not nil")
 	}
+
+	var eo EmissionOptions
+	if eo.Clock != nil || eo.Entropy != nil {
+		t.Error("EmissionOptions zero non-zero")
+	}
+
+	var ires IdentityResolution
+	if ires.SID != "" || ires.PriorSourceRef != "" || ires.MatchedVia != IdentityMatchNew {
+		t.Errorf("IdentityResolution zero = %+v", ires)
+	}
+
+	var im IdentityMatch
+	if im != IdentityMatchNew {
+		t.Errorf("IdentityMatch zero = %v, want IdentityMatchNew", im)
+	}
+}
+
+// TestIR_IdentityMatchString pins every IdentityMatch constant to its
+// short diagnostic label. IdentityMatchNew is the zero value so an unset
+// resolution surfaces as a fresh element rather than as a silent match.
+func TestIR_IdentityMatchString(t *testing.T) {
+	cases := map[IdentityMatch]string{
+		IdentityMatchNew:         "new",
+		IdentityMatchBySID:       "sid",
+		IdentityMatchBySourceRef: "source_ref",
+		IdentityMatchByFuzzy:     "fuzzy",
+	}
+	for m, want := range cases {
+		if got := m.String(); got != want {
+			t.Errorf("IdentityMatch(%d).String() = %q, want %q", m, got, want)
+		}
+	}
 }
 
 // TestIR_WorkspaceModeString pins every WorkspaceMode constant to its
