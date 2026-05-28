@@ -1,0 +1,5 @@
+view "v" {
+  budget {
+    label_chars: 48
+  }
+}

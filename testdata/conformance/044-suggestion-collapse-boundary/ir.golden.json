@@ -1,0 +1,103 @@
+{
+  "diagnostics": null,
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": null,
+        "Boundaries": [
+          {
+            "Kind": 1,
+            "Name": "pci",
+            "Children": [
+              {
+                "Kind": 1,
+                "Name": "api",
+                "Metadata": null,
+                "Override": null,
+                "Range": {
+                  "Start": 25,
+                  "End": 36
+                }
+              },
+              {
+                "Kind": 1,
+                "Name": "auth",
+                "Metadata": null,
+                "Override": null,
+                "Range": {
+                  "Start": 39,
+                  "End": 51
+                }
+              },
+              {
+                "Kind": 2,
+                "Name": "db",
+                "Metadata": null,
+                "Override": null,
+                "Range": {
+                  "Start": 54,
+                  "End": 65
+                }
+              }
+            ],
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 0,
+              "End": 67
+            }
+          }
+        ],
+        "Edges": null,
+        "Range": {
+          "Start": 0,
+          "End": 146
+        }
+      }
+    ],
+    "Views": [
+      {
+        "Name": "v",
+        "Title": "",
+        "Preset": "",
+        "Theme": "",
+        "Include": [
+          {
+            "Kind": 1,
+            "ElementKind": 0,
+            "Target": "pci",
+            "Range": {
+              "Start": 97,
+              "End": 111
+            }
+          }
+        ],
+        "Expand": null,
+        "Collapse": null,
+        "Layout": null,
+        "Budget": {
+          "Nodes": 2,
+          "EdgesPerNode": 0,
+          "Depth": 0,
+          "BoundaryFanout": 0,
+          "LabelChars": 0,
+          "Range": {
+            "Start": 118,
+            "End": 143
+          }
+        },
+        "Metadata": null,
+        "Range": {
+          "Start": 69,
+          "End": 145
+        }
+      }
+    ],
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 146
+    }
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "diagnostics": [
+    {
+      "Code": "SIR-VALIDATE-BAD-SOURCE-REF",
+      "Severity": 0,
+      "Message": "source_ref \"src/legacy.go#Legacy\" does not match canonical form code://\u003clang\u003e/\u003cmodule\u003e#\u003csymbol\u003e",
+      "Range": {
+        "Start": 0,
+        "End": 91
+      }
+    }
+  ],
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": [
+          {
+            "Kind": 1,
+            "Name": "legacy",
+            "Metadata": {
+              "sid": {
+                "Value": "01HQQQQQQQQQQQQQQQQQQQQQQQ",
+                "Range": {
+                  "Start": 24,
+                  "End": 52
+                }
+              },
+              "source_ref": {
+                "Value": "src/legacy.go#Legacy",
+                "Range": {
+                  "Start": 67,
+                  "End": 89
+                }
+              }
+            },
+            "Override": null,
+            "Range": {
+              "Start": 0,
+              "End": 91
+            }
+          }
+        ],
+        "Boundaries": null,
+        "Edges": null,
+        "Range": {
+          "Start": 0,
+          "End": 92
+        }
+      }
+    ],
+    "Views": null,
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 92
+    }
+  }
+}

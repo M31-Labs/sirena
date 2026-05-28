@@ -1,0 +1,4 @@
+service stale {
+  sid: "01F1111111111111111111ABCD"
+  source_ref: "src/stale.go#Stale"
+}

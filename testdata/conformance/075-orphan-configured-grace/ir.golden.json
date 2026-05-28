@@ -1,0 +1,59 @@
+{
+  "diagnostics": [
+    {
+      "Code": "SIR-VALIDATE-BAD-SOURCE-REF",
+      "Severity": 0,
+      "Message": "source_ref \"src/stale.go#Stale\" does not match canonical form code://\u003clang\u003e/\u003cmodule\u003e#\u003csymbol\u003e",
+      "Range": {
+        "Start": 0,
+        "End": 88
+      }
+    }
+  ],
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": [
+          {
+            "Kind": 1,
+            "Name": "stale",
+            "Metadata": {
+              "sid": {
+                "Value": "01F1111111111111111111ABCD",
+                "Range": {
+                  "Start": 23,
+                  "End": 51
+                }
+              },
+              "source_ref": {
+                "Value": "src/stale.go#Stale",
+                "Range": {
+                  "Start": 66,
+                  "End": 86
+                }
+              }
+            },
+            "Override": null,
+            "Range": {
+              "Start": 0,
+              "End": 88
+            }
+          }
+        ],
+        "Boundaries": null,
+        "Edges": null,
+        "Range": {
+          "Start": 0,
+          "End": 89
+        }
+      }
+    ],
+    "Views": null,
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 89
+    }
+  }
+}

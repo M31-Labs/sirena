@@ -1,0 +1,7 @@
+service api {
+  sid: "01HSAMESIDSAMESIDSAMESID0"
+}
+
+service worker {
+  sid: "01HSAMESIDSAMESIDSAMESID0"
+}

@@ -1,0 +1,30 @@
+service api
+
+service a
+
+service b
+
+service c
+
+service d
+
+api -> a: calls
+
+api -> b: calls
+
+api -> c: calls
+
+api -> d: calls
+
+view "v" {
+  include: [
+    service "api"
+    service "a"
+    service "b"
+    service "c"
+    service "d"
+  ]
+  budget {
+    edges_per_node: 2
+  }
+}

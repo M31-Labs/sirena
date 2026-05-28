@@ -1,0 +1,3 @@
+service api {
+  sirena_version: "0.2"
+}

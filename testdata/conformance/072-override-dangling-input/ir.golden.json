@@ -1,0 +1,43 @@
+{
+  "diagnostics": null,
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": [
+          {
+            "Kind": 1,
+            "Name": "ghost",
+            "Metadata": null,
+            "Override": {
+              "Mode": 2,
+              "Fields": [
+                "label"
+              ],
+              "Range": {
+                "Start": 14,
+                "End": 30
+              }
+            },
+            "Range": {
+              "Start": 0,
+              "End": 30
+            }
+          }
+        ],
+        "Boundaries": null,
+        "Edges": null,
+        "Range": {
+          "Start": 0,
+          "End": 31
+        }
+      }
+    ],
+    "Views": null,
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 31
+    }
+  }
+}

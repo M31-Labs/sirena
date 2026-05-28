@@ -1,0 +1,9 @@
+view "v" {
+  layout {
+    direction: top-down
+  }
+  budget {
+    nodes: 30
+    edges_per_node: 6
+  }
+}

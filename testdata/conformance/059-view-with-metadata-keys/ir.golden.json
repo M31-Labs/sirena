@@ -1,0 +1,62 @@
+{
+  "diagnostics": null,
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": null,
+        "Boundaries": null,
+        "Edges": null,
+        "Range": {
+          "Start": 0,
+          "End": 61
+        }
+      }
+    ],
+    "Views": [
+      {
+        "Name": "v",
+        "Title": "",
+        "Preset": "",
+        "Theme": "",
+        "Include": null,
+        "Expand": null,
+        "Collapse": null,
+        "Layout": null,
+        "Budget": null,
+        "Metadata": {
+          "author": {
+            "Value": "alice",
+            "Range": {
+              "Start": 21,
+              "End": 28
+            }
+          },
+          "priority": {
+            "Value": 3,
+            "Range": {
+              "Start": 57,
+              "End": 58
+            }
+          },
+          "status": {
+            "Value": "draft",
+            "Range": {
+              "Start": 39,
+              "End": 44
+            }
+          }
+        },
+        "Range": {
+          "Start": 0,
+          "End": 60
+        }
+      }
+    ],
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 61
+    }
+  }
+}

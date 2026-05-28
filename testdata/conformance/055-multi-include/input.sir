@@ -1,0 +1,14 @@
+boundary trust "pci" {
+  service api
+}
+service auth
+service router
+
+view "v" {
+  include: [
+    boundary "pci"
+    service "auth"
+    service "router"
+    edges: incoming to "api"
+  ]
+}

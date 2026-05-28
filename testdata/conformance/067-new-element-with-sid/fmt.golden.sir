@@ -1,0 +1,4 @@
+service newcomer {
+  sid: "01HZZZZZZZZZZZZZZZZZZZZZZZ"
+  source_ref: "src/newcomer.go#Newcomer"
+}

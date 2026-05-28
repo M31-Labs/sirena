@@ -1,0 +1,86 @@
+{
+  "diagnostics": null,
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": [
+          {
+            "Kind": 1,
+            "Name": "alone",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 0,
+              "End": 13
+            }
+          },
+          {
+            "Kind": 1,
+            "Name": "api",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 14,
+              "End": 25
+            }
+          },
+          {
+            "Kind": 1,
+            "Name": "db",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 26,
+              "End": 36
+            }
+          }
+        ],
+        "Boundaries": null,
+        "Edges": [
+          {
+            "From": "api",
+            "To": "db",
+            "FromRef": {
+              "Namespace": "",
+              "Name": "api",
+              "Range": {
+                "Start": 37,
+                "End": 40
+              },
+              "Definition": null
+            },
+            "ToRef": {
+              "Namespace": "",
+              "Name": "db",
+              "Range": {
+                "Start": 44,
+                "End": 46
+              },
+              "Definition": null
+            },
+            "Kind": 3,
+            "Direction": 1,
+            "Label": "",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 37,
+              "End": 54
+            }
+          }
+        ],
+        "Range": {
+          "Start": 0,
+          "End": 55
+        }
+      }
+    ],
+    "Views": null,
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 55
+    }
+  }
+}

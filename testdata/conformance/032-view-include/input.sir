@@ -1,0 +1,7 @@
+service api
+
+view "v" {
+  include: [
+    service "api"
+  ]
+}

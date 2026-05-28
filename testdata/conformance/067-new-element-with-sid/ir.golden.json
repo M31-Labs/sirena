@@ -1,0 +1,59 @@
+{
+  "diagnostics": [
+    {
+      "Code": "SIR-VALIDATE-BAD-SOURCE-REF",
+      "Severity": 0,
+      "Message": "source_ref \"src/newcomer.go#Newcomer\" does not match canonical form code://\u003clang\u003e/\u003cmodule\u003e#\u003csymbol\u003e",
+      "Range": {
+        "Start": 0,
+        "End": 97
+      }
+    }
+  ],
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": [
+          {
+            "Kind": 1,
+            "Name": "newcomer",
+            "Metadata": {
+              "sid": {
+                "Value": "01HZZZZZZZZZZZZZZZZZZZZZZZ",
+                "Range": {
+                  "Start": 26,
+                  "End": 54
+                }
+              },
+              "source_ref": {
+                "Value": "src/newcomer.go#Newcomer",
+                "Range": {
+                  "Start": 69,
+                  "End": 95
+                }
+              }
+            },
+            "Override": null,
+            "Range": {
+              "Start": 0,
+              "End": 97
+            }
+          }
+        ],
+        "Boundaries": null,
+        "Edges": null,
+        "Range": {
+          "Start": 0,
+          "End": 98
+        }
+      }
+    ],
+    "Views": null,
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 98
+    }
+  }
+}

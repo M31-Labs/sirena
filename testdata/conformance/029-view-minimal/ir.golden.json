@@ -1,0 +1,40 @@
+{
+  "diagnostics": null,
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": null,
+        "Boundaries": null,
+        "Edges": null,
+        "Range": {
+          "Start": 0,
+          "End": 13
+        }
+      }
+    ],
+    "Views": [
+      {
+        "Name": "v",
+        "Title": "",
+        "Preset": "",
+        "Theme": "",
+        "Include": null,
+        "Expand": null,
+        "Collapse": null,
+        "Layout": null,
+        "Budget": null,
+        "Metadata": null,
+        "Range": {
+          "Start": 0,
+          "End": 12
+        }
+      }
+    ],
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 13
+    }
+  }
+}

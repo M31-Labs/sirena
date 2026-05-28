@@ -1,0 +1,59 @@
+{
+  "diagnostics": [
+    {
+      "Code": "SIR-VALIDATE-BAD-SOURCE-REF",
+      "Severity": 0,
+      "Message": "source_ref \"src/api.go#APIService\" does not match canonical form code://\u003clang\u003e/\u003cmodule\u003e#\u003csymbol\u003e",
+      "Range": {
+        "Start": 0,
+        "End": 89
+      }
+    }
+  ],
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": [
+          {
+            "Kind": 1,
+            "Name": "api",
+            "Metadata": {
+              "sid": {
+                "Value": "01HABCDEF0123456789ABCDEFG",
+                "Range": {
+                  "Start": 21,
+                  "End": 49
+                }
+              },
+              "source_ref": {
+                "Value": "src/api.go#APIService",
+                "Range": {
+                  "Start": 64,
+                  "End": 87
+                }
+              }
+            },
+            "Override": null,
+            "Range": {
+              "Start": 0,
+              "End": 89
+            }
+          }
+        ],
+        "Boundaries": null,
+        "Edges": null,
+        "Range": {
+          "Start": 0,
+          "End": 90
+        }
+      }
+    ],
+    "Views": null,
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 90
+    }
+  }
+}

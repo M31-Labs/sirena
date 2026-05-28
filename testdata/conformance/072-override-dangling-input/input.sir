@@ -1,0 +1,1 @@
+service ghost @override(label)

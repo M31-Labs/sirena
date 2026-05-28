@@ -1,0 +1,5 @@
+view "v" {
+  author: "alice"
+  status: draft
+  priority: 3
+}

@@ -1,0 +1,10 @@
+boundary trust "old" {
+  service legacy
+}
+
+view "v" {
+  include: [
+    boundary "old"
+  ]
+  collapse: ["old"]
+}

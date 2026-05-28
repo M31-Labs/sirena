@@ -1,0 +1,126 @@
+{
+  "diagnostics": null,
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": [
+          {
+            "Kind": 1,
+            "Name": "auth",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 39,
+              "End": 51
+            }
+          }
+        ],
+        "Boundaries": [
+          {
+            "Kind": 1,
+            "Name": "pci",
+            "Children": [
+              {
+                "Kind": 1,
+                "Name": "api",
+                "Metadata": null,
+                "Override": null,
+                "Range": {
+                  "Start": 25,
+                  "End": 36
+                }
+              }
+            ],
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 0,
+              "End": 38
+            }
+          }
+        ],
+        "Edges": null,
+        "Range": {
+          "Start": 0,
+          "End": 452
+        }
+      }
+    ],
+    "Views": [
+      {
+        "Name": "payments",
+        "Title": "Payments — data plane",
+        "Preset": "sociotechnical",
+        "Theme": "earth-default",
+        "Include": [
+          {
+            "Kind": 1,
+            "ElementKind": 0,
+            "Target": "pci",
+            "Range": {
+              "Start": 148,
+              "End": 162
+            }
+          },
+          {
+            "Kind": 2,
+            "ElementKind": 1,
+            "Target": "auth",
+            "Range": {
+              "Start": 167,
+              "End": 181
+            }
+          },
+          {
+            "Kind": 3,
+            "ElementKind": 0,
+            "Target": "api",
+            "Range": {
+              "Start": 186,
+              "End": 210
+            }
+          }
+        ],
+        "Expand": [
+          "pci"
+        ],
+        "Collapse": [
+          "legacy"
+        ],
+        "Layout": {
+          "Direction": "top-down",
+          "Pin": {
+            "api": "top"
+          },
+          "Metadata": null,
+          "Range": {
+            "Start": 281,
+            "End": 341
+          }
+        },
+        "Budget": {
+          "Nodes": 30,
+          "EdgesPerNode": 6,
+          "Depth": 4,
+          "BoundaryFanout": 12,
+          "LabelChars": 64,
+          "Range": {
+            "Start": 344,
+            "End": 449
+          }
+        },
+        "Metadata": null,
+        "Range": {
+          "Start": 53,
+          "End": 451
+        }
+      }
+    ],
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 452
+    }
+  }
+}

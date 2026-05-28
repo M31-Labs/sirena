@@ -1,0 +1,25 @@
+boundary trust "core" {
+  service s1
+  service s2
+  service s3
+  service s4
+  service s5
+  service s6
+  service s7
+  service s8
+  service s9
+  service s10
+  service s11
+  service s12
+  service s13
+  service s14
+  service s15
+  service s16
+}
+
+view "v" {
+  preset: default
+  include: [
+    boundary "core"
+  ]
+}

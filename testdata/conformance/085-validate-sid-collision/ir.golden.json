@@ -1,0 +1,70 @@
+{
+  "diagnostics": [
+    {
+      "Code": "SIR-VALIDATE-SID-COLLISION",
+      "Severity": 0,
+      "Message": "sid \"01HSAMESIDSAMESIDSAMESID0\" reused (first declared at byte 0)",
+      "Range": {
+        "Start": 51,
+        "End": 104
+      }
+    }
+  ],
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": [
+          {
+            "Kind": 1,
+            "Name": "api",
+            "Metadata": {
+              "sid": {
+                "Value": "01HSAMESIDSAMESIDSAMESID0",
+                "Range": {
+                  "Start": 21,
+                  "End": 48
+                }
+              }
+            },
+            "Override": null,
+            "Range": {
+              "Start": 0,
+              "End": 50
+            }
+          },
+          {
+            "Kind": 1,
+            "Name": "worker",
+            "Metadata": {
+              "sid": {
+                "Value": "01HSAMESIDSAMESIDSAMESID0",
+                "Range": {
+                  "Start": 75,
+                  "End": 102
+                }
+              }
+            },
+            "Override": null,
+            "Range": {
+              "Start": 51,
+              "End": 104
+            }
+          }
+        ],
+        "Boundaries": null,
+        "Edges": null,
+        "Range": {
+          "Start": 0,
+          "End": 105
+        }
+      }
+    ],
+    "Views": null,
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 105
+    }
+  }
+}

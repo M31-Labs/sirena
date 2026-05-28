@@ -1,0 +1,9 @@
+view "v" {
+  budget {
+    nodes: 30
+    edges_per_node: 6
+    depth: 4
+    boundary_fanout: 12
+    label_chars: 64
+  }
+}

@@ -1,0 +1,11 @@
+service api
+
+service db
+
+api -> db: writes
+
+view "v" {
+  include: [
+    edges: outgoing from "api"
+  ]
+}

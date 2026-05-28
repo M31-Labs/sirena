@@ -1,0 +1,128 @@
+{
+  "diagnostics": null,
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": [
+          {
+            "Kind": 1,
+            "Name": "api",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 0,
+              "End": 11
+            }
+          },
+          {
+            "Kind": 1,
+            "Name": "a",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 12,
+              "End": 21
+            }
+          },
+          {
+            "Kind": 1,
+            "Name": "b",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 22,
+              "End": 31
+            }
+          },
+          {
+            "Kind": 1,
+            "Name": "c",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 32,
+              "End": 41
+            }
+          }
+        ],
+        "Boundaries": null,
+        "Edges": null,
+        "Range": {
+          "Start": 0,
+          "End": 167
+        }
+      }
+    ],
+    "Views": [
+      {
+        "Name": "v",
+        "Title": "",
+        "Preset": "",
+        "Theme": "",
+        "Include": [
+          {
+            "Kind": 2,
+            "ElementKind": 1,
+            "Target": "api",
+            "Range": {
+              "Start": 71,
+              "End": 84
+            }
+          },
+          {
+            "Kind": 2,
+            "ElementKind": 1,
+            "Target": "a",
+            "Range": {
+              "Start": 89,
+              "End": 100
+            }
+          },
+          {
+            "Kind": 2,
+            "ElementKind": 1,
+            "Target": "b",
+            "Range": {
+              "Start": 105,
+              "End": 116
+            }
+          },
+          {
+            "Kind": 2,
+            "ElementKind": 1,
+            "Target": "c",
+            "Range": {
+              "Start": 121,
+              "End": 132
+            }
+          }
+        ],
+        "Expand": null,
+        "Collapse": null,
+        "Layout": null,
+        "Budget": {
+          "Nodes": 2,
+          "EdgesPerNode": 0,
+          "Depth": 0,
+          "BoundaryFanout": 0,
+          "LabelChars": 0,
+          "Range": {
+            "Start": 139,
+            "End": 164
+          }
+        },
+        "Metadata": null,
+        "Range": {
+          "Start": 43,
+          "End": 166
+        }
+      }
+    ],
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 167
+    }
+  }
+}

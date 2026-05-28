@@ -1,0 +1,4 @@
+view "v" {
+  preset: sociotechnical
+  theme: earth-default
+}

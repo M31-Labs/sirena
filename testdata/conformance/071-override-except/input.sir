@@ -1,0 +1,3 @@
+service api @override(except: source_ref) {
+  source_ref: "ignored"
+}

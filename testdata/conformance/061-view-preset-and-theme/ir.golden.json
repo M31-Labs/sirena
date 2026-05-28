@@ -1,0 +1,40 @@
+{
+  "diagnostics": null,
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": null,
+        "Boundaries": null,
+        "Edges": null,
+        "Range": {
+          "Start": 0,
+          "End": 61
+        }
+      }
+    ],
+    "Views": [
+      {
+        "Name": "v",
+        "Title": "",
+        "Preset": "sociotechnical",
+        "Theme": "earth-default",
+        "Include": null,
+        "Expand": null,
+        "Collapse": null,
+        "Layout": null,
+        "Budget": null,
+        "Metadata": null,
+        "Range": {
+          "Start": 0,
+          "End": 60
+        }
+      }
+    ],
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 61
+    }
+  }
+}

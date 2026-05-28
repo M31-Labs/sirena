@@ -1,0 +1,40 @@
+{
+  "diagnostics": null,
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": null,
+        "Boundaries": null,
+        "Edges": null,
+        "Range": {
+          "Start": 0,
+          "End": 35
+        }
+      }
+    ],
+    "Views": [
+      {
+        "Name": "v",
+        "Title": "Data Plane",
+        "Preset": "",
+        "Theme": "",
+        "Include": null,
+        "Expand": null,
+        "Collapse": null,
+        "Layout": null,
+        "Budget": null,
+        "Metadata": null,
+        "Range": {
+          "Start": 0,
+          "End": 34
+        }
+      }
+    ],
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 35
+    }
+  }
+}

@@ -1,0 +1,5 @@
+view "v" {
+  budget {
+    boundary_fanout: 8
+  }
+}

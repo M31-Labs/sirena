@@ -1,0 +1,10 @@
+boundary trust "pci" {
+  service api
+}
+
+view "v" {
+  include: [
+    boundary "pci"
+  ]
+  expand: [pci]
+}

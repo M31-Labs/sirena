@@ -1,0 +1,166 @@
+{
+  "diagnostics": null,
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": [
+          {
+            "Kind": 1,
+            "Name": "a",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 0,
+              "End": 9
+            }
+          },
+          {
+            "Kind": 1,
+            "Name": "b",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 10,
+              "End": 19
+            }
+          },
+          {
+            "Kind": 1,
+            "Name": "c",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 20,
+              "End": 29
+            }
+          },
+          {
+            "Kind": 1,
+            "Name": "d",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 30,
+              "End": 39
+            }
+          },
+          {
+            "Kind": 1,
+            "Name": "e",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 40,
+              "End": 49
+            }
+          },
+          {
+            "Kind": 1,
+            "Name": "f",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 50,
+              "End": 59
+            }
+          }
+        ],
+        "Boundaries": null,
+        "Edges": null,
+        "Range": {
+          "Start": 0,
+          "End": 215
+        }
+      }
+    ],
+    "Views": [
+      {
+        "Name": "v",
+        "Title": "",
+        "Preset": "",
+        "Theme": "",
+        "Include": [
+          {
+            "Kind": 2,
+            "ElementKind": 1,
+            "Target": "a",
+            "Range": {
+              "Start": 89,
+              "End": 100
+            }
+          },
+          {
+            "Kind": 2,
+            "ElementKind": 1,
+            "Target": "b",
+            "Range": {
+              "Start": 105,
+              "End": 116
+            }
+          },
+          {
+            "Kind": 2,
+            "ElementKind": 1,
+            "Target": "c",
+            "Range": {
+              "Start": 121,
+              "End": 132
+            }
+          },
+          {
+            "Kind": 2,
+            "ElementKind": 1,
+            "Target": "d",
+            "Range": {
+              "Start": 137,
+              "End": 148
+            }
+          },
+          {
+            "Kind": 2,
+            "ElementKind": 1,
+            "Target": "e",
+            "Range": {
+              "Start": 153,
+              "End": 164
+            }
+          },
+          {
+            "Kind": 2,
+            "ElementKind": 1,
+            "Target": "f",
+            "Range": {
+              "Start": 169,
+              "End": 180
+            }
+          }
+        ],
+        "Expand": null,
+        "Collapse": null,
+        "Layout": null,
+        "Budget": {
+          "Nodes": 2,
+          "EdgesPerNode": 0,
+          "Depth": 0,
+          "BoundaryFanout": 0,
+          "LabelChars": 0,
+          "Range": {
+            "Start": 187,
+            "End": 212
+          }
+        },
+        "Metadata": null,
+        "Range": {
+          "Start": 61,
+          "End": 214
+        }
+      }
+    ],
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 215
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "diagnostics": [
+    {
+      "Code": "SIR-VALIDATE-BAD-SOURCE-REF",
+      "Severity": 0,
+      "Message": "source_ref \"not-a-uri\" does not match canonical form code://\u003clang\u003e/\u003cmodule\u003e#\u003csymbol\u003e",
+      "Range": {
+        "Start": 0,
+        "End": 41
+      }
+    }
+  ],
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": [
+          {
+            "Kind": 1,
+            "Name": "api",
+            "Metadata": {
+              "source_ref": {
+                "Value": "not-a-uri",
+                "Range": {
+                  "Start": 28,
+                  "End": 39
+                }
+              }
+            },
+            "Override": null,
+            "Range": {
+              "Start": 0,
+              "End": 41
+            }
+          }
+        ],
+        "Boundaries": null,
+        "Edges": null,
+        "Range": {
+          "Start": 0,
+          "End": 42
+        }
+      }
+    ],
+    "Views": null,
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 42
+    }
+  }
+}

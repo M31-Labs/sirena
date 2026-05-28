@@ -1,0 +1,48 @@
+{
+  "diagnostics": null,
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": null,
+        "Boundaries": null,
+        "Edges": null,
+        "Range": {
+          "Start": 0,
+          "End": 54
+        }
+      }
+    ],
+    "Views": [
+      {
+        "Name": "v",
+        "Title": "",
+        "Preset": "",
+        "Theme": "",
+        "Include": null,
+        "Expand": null,
+        "Collapse": null,
+        "Layout": {
+          "Direction": "left-right",
+          "Pin": null,
+          "Metadata": null,
+          "Range": {
+            "Start": 13,
+            "End": 51
+          }
+        },
+        "Budget": null,
+        "Metadata": null,
+        "Range": {
+          "Start": 0,
+          "End": 53
+        }
+      }
+    ],
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 54
+    }
+  }
+}

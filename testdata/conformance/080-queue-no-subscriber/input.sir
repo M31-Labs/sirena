@@ -1,0 +1,3 @@
+queue events
+service producer
+producer -> events: publishes

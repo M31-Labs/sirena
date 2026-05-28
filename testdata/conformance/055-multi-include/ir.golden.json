@@ -1,0 +1,121 @@
+{
+  "diagnostics": null,
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": [
+          {
+            "Kind": 1,
+            "Name": "auth",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 39,
+              "End": 51
+            }
+          },
+          {
+            "Kind": 1,
+            "Name": "router",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 52,
+              "End": 66
+            }
+          }
+        ],
+        "Boundaries": [
+          {
+            "Kind": 1,
+            "Name": "pci",
+            "Children": [
+              {
+                "Kind": 1,
+                "Name": "api",
+                "Metadata": null,
+                "Override": null,
+                "Range": {
+                  "Start": 25,
+                  "End": 36
+                }
+              }
+            ],
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 0,
+              "End": 38
+            }
+          }
+        ],
+        "Edges": null,
+        "Range": {
+          "Start": 0,
+          "End": 186
+        }
+      }
+    ],
+    "Views": [
+      {
+        "Name": "v",
+        "Title": "",
+        "Preset": "",
+        "Theme": "",
+        "Include": [
+          {
+            "Kind": 1,
+            "ElementKind": 0,
+            "Target": "pci",
+            "Range": {
+              "Start": 96,
+              "End": 110
+            }
+          },
+          {
+            "Kind": 2,
+            "ElementKind": 1,
+            "Target": "auth",
+            "Range": {
+              "Start": 115,
+              "End": 129
+            }
+          },
+          {
+            "Kind": 2,
+            "ElementKind": 1,
+            "Target": "router",
+            "Range": {
+              "Start": 134,
+              "End": 150
+            }
+          },
+          {
+            "Kind": 3,
+            "ElementKind": 0,
+            "Target": "api",
+            "Range": {
+              "Start": 155,
+              "End": 179
+            }
+          }
+        ],
+        "Expand": null,
+        "Collapse": null,
+        "Layout": null,
+        "Budget": null,
+        "Metadata": null,
+        "Range": {
+          "Start": 68,
+          "End": 185
+        }
+      }
+    ],
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 186
+    }
+  }
+}

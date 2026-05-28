@@ -1,0 +1,14 @@
+boundary trust "pci" {
+  service api
+  service auth
+  database db
+}
+
+view "v" {
+  include: [
+    boundary "pci"
+  ]
+  budget {
+    nodes: 2
+  }
+}

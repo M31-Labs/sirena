@@ -1,0 +1,7 @@
+service alone
+
+service api
+
+service db
+
+api -> db: writes

@@ -1,0 +1,15 @@
+boundary trust "new" {
+  service api
+}
+boundary trust "old" {
+  service legacy
+}
+
+view "v" {
+  include: [
+    boundary "new"
+    boundary "old"
+  ]
+  expand: ["new"]
+  collapse: ["old"]
+}

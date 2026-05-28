@@ -1,0 +1,223 @@
+{
+  "diagnostics": null,
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": null,
+        "Boundaries": [
+          {
+            "Kind": 1,
+            "Name": "core",
+            "Children": [
+              {
+                "Kind": 1,
+                "Name": "s1",
+                "Metadata": null,
+                "Override": null,
+                "Range": {
+                  "Start": 26,
+                  "End": 36
+                }
+              },
+              {
+                "Kind": 1,
+                "Name": "s2",
+                "Metadata": null,
+                "Override": null,
+                "Range": {
+                  "Start": 39,
+                  "End": 49
+                }
+              },
+              {
+                "Kind": 1,
+                "Name": "s3",
+                "Metadata": null,
+                "Override": null,
+                "Range": {
+                  "Start": 52,
+                  "End": 62
+                }
+              },
+              {
+                "Kind": 1,
+                "Name": "s4",
+                "Metadata": null,
+                "Override": null,
+                "Range": {
+                  "Start": 65,
+                  "End": 75
+                }
+              },
+              {
+                "Kind": 1,
+                "Name": "s5",
+                "Metadata": null,
+                "Override": null,
+                "Range": {
+                  "Start": 78,
+                  "End": 88
+                }
+              },
+              {
+                "Kind": 1,
+                "Name": "s6",
+                "Metadata": null,
+                "Override": null,
+                "Range": {
+                  "Start": 91,
+                  "End": 101
+                }
+              },
+              {
+                "Kind": 1,
+                "Name": "s7",
+                "Metadata": null,
+                "Override": null,
+                "Range": {
+                  "Start": 104,
+                  "End": 114
+                }
+              },
+              {
+                "Kind": 1,
+                "Name": "s8",
+                "Metadata": null,
+                "Override": null,
+                "Range": {
+                  "Start": 117,
+                  "End": 127
+                }
+              },
+              {
+                "Kind": 1,
+                "Name": "s9",
+                "Metadata": null,
+                "Override": null,
+                "Range": {
+                  "Start": 130,
+                  "End": 140
+                }
+              },
+              {
+                "Kind": 1,
+                "Name": "s10",
+                "Metadata": null,
+                "Override": null,
+                "Range": {
+                  "Start": 143,
+                  "End": 154
+                }
+              },
+              {
+                "Kind": 1,
+                "Name": "s11",
+                "Metadata": null,
+                "Override": null,
+                "Range": {
+                  "Start": 157,
+                  "End": 168
+                }
+              },
+              {
+                "Kind": 1,
+                "Name": "s12",
+                "Metadata": null,
+                "Override": null,
+                "Range": {
+                  "Start": 171,
+                  "End": 182
+                }
+              },
+              {
+                "Kind": 1,
+                "Name": "s13",
+                "Metadata": null,
+                "Override": null,
+                "Range": {
+                  "Start": 185,
+                  "End": 196
+                }
+              },
+              {
+                "Kind": 1,
+                "Name": "s14",
+                "Metadata": null,
+                "Override": null,
+                "Range": {
+                  "Start": 199,
+                  "End": 210
+                }
+              },
+              {
+                "Kind": 1,
+                "Name": "s15",
+                "Metadata": null,
+                "Override": null,
+                "Range": {
+                  "Start": 213,
+                  "End": 224
+                }
+              },
+              {
+                "Kind": 1,
+                "Name": "s16",
+                "Metadata": null,
+                "Override": null,
+                "Range": {
+                  "Start": 227,
+                  "End": 238
+                }
+              }
+            ],
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 0,
+              "End": 240
+            }
+          }
+        ],
+        "Edges": null,
+        "Range": {
+          "Start": 0,
+          "End": 310
+        }
+      }
+    ],
+    "Views": [
+      {
+        "Name": "v",
+        "Title": "",
+        "Preset": "default",
+        "Theme": "",
+        "Include": [
+          {
+            "Kind": 1,
+            "ElementKind": 0,
+            "Target": "core",
+            "Range": {
+              "Start": 288,
+              "End": 303
+            }
+          }
+        ],
+        "Expand": null,
+        "Collapse": null,
+        "Layout": null,
+        "Budget": null,
+        "Metadata": null,
+        "Range": {
+          "Start": 242,
+          "End": 309
+        }
+      }
+    ],
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 310
+    }
+  }
+}

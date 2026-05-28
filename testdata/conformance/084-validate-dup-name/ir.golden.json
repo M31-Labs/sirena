@@ -1,0 +1,54 @@
+{
+  "diagnostics": [
+    {
+      "Code": "SIR-VALIDATE-DUP-NAME",
+      "Severity": 0,
+      "Message": "name \"api\" redeclared in scope",
+      "Range": {
+        "Start": 12,
+        "End": 23
+      }
+    }
+  ],
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": [
+          {
+            "Kind": 1,
+            "Name": "api",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 0,
+              "End": 11
+            }
+          },
+          {
+            "Kind": 1,
+            "Name": "api",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 12,
+              "End": 23
+            }
+          }
+        ],
+        "Boundaries": null,
+        "Edges": null,
+        "Range": {
+          "Start": 0,
+          "End": 24
+        }
+      }
+    ],
+    "Views": null,
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 24
+    }
+  }
+}

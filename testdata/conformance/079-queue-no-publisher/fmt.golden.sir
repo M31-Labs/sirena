@@ -1,0 +1,5 @@
+queue events
+
+service consumer
+
+events -> consumer: subscribes

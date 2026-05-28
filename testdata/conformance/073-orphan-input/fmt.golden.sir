@@ -1,0 +1,4 @@
+service legacy {
+  sid: "01HQQQQQQQQQQQQQQQQQQQQQQQ"
+  source_ref: "src/legacy.go#Legacy"
+}

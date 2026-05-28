@@ -1,0 +1,11 @@
+service api
+
+service caller
+
+caller -> api: calls
+
+view "v" {
+  include: [
+    edges: incoming to "api"
+  ]
+}

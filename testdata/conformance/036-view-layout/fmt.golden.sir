@@ -1,0 +1,5 @@
+view "v" {
+  layout {
+    direction: top-down
+  }
+}

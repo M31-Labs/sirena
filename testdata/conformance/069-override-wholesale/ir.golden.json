@@ -1,0 +1,41 @@
+{
+  "diagnostics": null,
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": [
+          {
+            "Kind": 1,
+            "Name": "api",
+            "Metadata": null,
+            "Override": {
+              "Mode": 1,
+              "Fields": null,
+              "Range": {
+                "Start": 12,
+                "End": 21
+              }
+            },
+            "Range": {
+              "Start": 0,
+              "End": 21
+            }
+          }
+        ],
+        "Boundaries": null,
+        "Edges": null,
+        "Range": {
+          "Start": 0,
+          "End": 22
+        }
+      }
+    ],
+    "Views": null,
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 22
+    }
+  }
+}

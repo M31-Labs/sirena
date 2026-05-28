@@ -1,0 +1,4 @@
+service ancient {
+  sid: "01F0000000000000000000ABCD"
+  source_ref: "src/ancient.go#Ancient"
+}

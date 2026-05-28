@@ -1,0 +1,19 @@
+service api
+
+service a
+
+service b
+
+service c
+
+view "v" {
+  include: [
+    service "api"
+    service "a"
+    service "b"
+    service "c"
+  ]
+  budget {
+    nodes: 2
+  }
+}

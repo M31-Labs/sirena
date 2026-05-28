@@ -1,0 +1,5 @@
+service api {
+  prior_source_ref: "src/api.go#OldName"
+  sid: "01HABCDEF0123456789ABCDEFG"
+  source_ref: "src/api.go#NewName"
+}

@@ -1,0 +1,50 @@
+{
+  "diagnostics": null,
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": null,
+        "Boundaries": null,
+        "Edges": null,
+        "Range": {
+          "Start": 0,
+          "End": 51
+        }
+      }
+    ],
+    "Views": [
+      {
+        "Name": "v",
+        "Title": "",
+        "Preset": "",
+        "Theme": "",
+        "Include": null,
+        "Expand": null,
+        "Collapse": null,
+        "Layout": null,
+        "Budget": {
+          "Nodes": 0,
+          "EdgesPerNode": 0,
+          "Depth": 0,
+          "BoundaryFanout": 8,
+          "LabelChars": 0,
+          "Range": {
+            "Start": 13,
+            "End": 48
+          }
+        },
+        "Metadata": null,
+        "Range": {
+          "Start": 0,
+          "End": 50
+        }
+      }
+    ],
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 51
+    }
+  }
+}

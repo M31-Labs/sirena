@@ -1,0 +1,75 @@
+{
+  "diagnostics": null,
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": null,
+        "Boundaries": [
+          {
+            "Kind": 1,
+            "Name": "old",
+            "Children": [
+              {
+                "Kind": 1,
+                "Name": "legacy",
+                "Metadata": null,
+                "Override": null,
+                "Range": {
+                  "Start": 25,
+                  "End": 39
+                }
+              }
+            ],
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 0,
+              "End": 41
+            }
+          }
+        ],
+        "Edges": null,
+        "Range": {
+          "Start": 0,
+          "End": 112
+        }
+      }
+    ],
+    "Views": [
+      {
+        "Name": "v",
+        "Title": "",
+        "Preset": "",
+        "Theme": "",
+        "Include": [
+          {
+            "Kind": 1,
+            "ElementKind": 0,
+            "Target": "old",
+            "Range": {
+              "Start": 71,
+              "End": 85
+            }
+          }
+        ],
+        "Expand": null,
+        "Collapse": [
+          "old"
+        ],
+        "Layout": null,
+        "Budget": null,
+        "Metadata": null,
+        "Range": {
+          "Start": 43,
+          "End": 111
+        }
+      }
+    ],
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 112
+    }
+  }
+}

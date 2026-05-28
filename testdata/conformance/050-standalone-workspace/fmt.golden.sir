@@ -1,0 +1,5 @@
+service api
+
+database db
+
+api -> db: reads

@@ -1,0 +1,5 @@
+view "v" {
+  budget {
+    edges_per_node: 4
+  }
+}

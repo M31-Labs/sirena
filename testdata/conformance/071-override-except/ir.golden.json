@@ -1,0 +1,61 @@
+{
+  "diagnostics": [
+    {
+      "Code": "SIR-VALIDATE-BAD-SOURCE-REF",
+      "Severity": 0,
+      "Message": "source_ref \"ignored\" does not match canonical form code://\u003clang\u003e/\u003cmodule\u003e#\u003csymbol\u003e",
+      "Range": {
+        "Start": 0,
+        "End": 69
+      }
+    }
+  ],
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": [
+          {
+            "Kind": 1,
+            "Name": "api",
+            "Metadata": {
+              "source_ref": {
+                "Value": "ignored",
+                "Range": {
+                  "Start": 58,
+                  "End": 67
+                }
+              }
+            },
+            "Override": {
+              "Mode": 3,
+              "Fields": [
+                "source_ref"
+              ],
+              "Range": {
+                "Start": 12,
+                "End": 41
+              }
+            },
+            "Range": {
+              "Start": 0,
+              "End": 69
+            }
+          }
+        ],
+        "Boundaries": null,
+        "Edges": null,
+        "Range": {
+          "Start": 0,
+          "End": 70
+        }
+      }
+    ],
+    "Views": null,
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 70
+    }
+  }
+}

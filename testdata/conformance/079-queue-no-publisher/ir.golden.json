@@ -1,0 +1,76 @@
+{
+  "diagnostics": null,
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": [
+          {
+            "Kind": 3,
+            "Name": "events",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 0,
+              "End": 12
+            }
+          },
+          {
+            "Kind": 1,
+            "Name": "consumer",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 13,
+              "End": 29
+            }
+          }
+        ],
+        "Boundaries": null,
+        "Edges": [
+          {
+            "From": "events",
+            "To": "consumer",
+            "FromRef": {
+              "Namespace": "",
+              "Name": "events",
+              "Range": {
+                "Start": 30,
+                "End": 36
+              },
+              "Definition": null
+            },
+            "ToRef": {
+              "Namespace": "",
+              "Name": "consumer",
+              "Range": {
+                "Start": 40,
+                "End": 48
+              },
+              "Definition": null
+            },
+            "Kind": 5,
+            "Direction": 1,
+            "Label": "",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 30,
+              "End": 60
+            }
+          }
+        ],
+        "Range": {
+          "Start": 0,
+          "End": 61
+        }
+      }
+    ],
+    "Views": null,
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 61
+    }
+  }
+}

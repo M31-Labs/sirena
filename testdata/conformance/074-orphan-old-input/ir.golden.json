@@ -1,0 +1,59 @@
+{
+  "diagnostics": [
+    {
+      "Code": "SIR-VALIDATE-BAD-SOURCE-REF",
+      "Severity": 0,
+      "Message": "source_ref \"src/ancient.go#Ancient\" does not match canonical form code://\u003clang\u003e/\u003cmodule\u003e#\u003csymbol\u003e",
+      "Range": {
+        "Start": 0,
+        "End": 94
+      }
+    }
+  ],
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": [
+          {
+            "Kind": 1,
+            "Name": "ancient",
+            "Metadata": {
+              "sid": {
+                "Value": "01F0000000000000000000ABCD",
+                "Range": {
+                  "Start": 25,
+                  "End": 53
+                }
+              },
+              "source_ref": {
+                "Value": "src/ancient.go#Ancient",
+                "Range": {
+                  "Start": 68,
+                  "End": 92
+                }
+              }
+            },
+            "Override": null,
+            "Range": {
+              "Start": 0,
+              "End": 94
+            }
+          }
+        ],
+        "Boundaries": null,
+        "Edges": null,
+        "Range": {
+          "Start": 0,
+          "End": 95
+        }
+      }
+    ],
+    "Views": null,
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 95
+    }
+  }
+}

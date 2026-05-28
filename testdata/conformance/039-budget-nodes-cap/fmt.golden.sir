@@ -1,0 +1,5 @@
+view "v" {
+  budget {
+    nodes: 10
+  }
+}

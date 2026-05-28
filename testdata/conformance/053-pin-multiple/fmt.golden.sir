@@ -1,0 +1,5 @@
+view "v" {
+  layout {
+    pin: { "api": top, "cache": left, "db": bottom }
+  }
+}

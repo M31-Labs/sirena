@@ -1,0 +1,4 @@
+import "platform"
+
+service api
+api -> platform.kafka: publishes

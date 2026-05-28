@@ -1,0 +1,29 @@
+service auth
+
+boundary trust "pci" {
+  service api
+}
+
+view "payments" {
+  title: "Payments — data plane"
+  preset: sociotechnical
+  include: [
+    boundary "pci"
+    service "auth"
+    edges: incoming to "api"
+  ]
+  expand: [pci]
+  collapse: [legacy]
+  theme: earth-default
+  layout {
+    direction: top-down
+    pin: { "api": top }
+  }
+  budget {
+    nodes: 30
+    edges_per_node: 6
+    depth: 4
+    boundary_fanout: 12
+    label_chars: 64
+  }
+}

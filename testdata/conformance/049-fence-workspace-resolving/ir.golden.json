@@ -1,0 +1,74 @@
+{
+  "diagnostics": null,
+  "document": {
+    "Imports": [
+      {
+        "Path": "platform",
+        "Range": {
+          "Start": 0,
+          "End": 17
+        }
+      }
+    ],
+    "Systems": [
+      {
+        "Elements": [
+          {
+            "Kind": 1,
+            "Name": "api",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 19,
+              "End": 30
+            }
+          }
+        ],
+        "Boundaries": null,
+        "Edges": [
+          {
+            "From": "api",
+            "To": "platform.kafka",
+            "FromRef": {
+              "Namespace": "",
+              "Name": "api",
+              "Range": {
+                "Start": 31,
+                "End": 34
+              },
+              "Definition": null
+            },
+            "ToRef": {
+              "Namespace": "platform",
+              "Name": "kafka",
+              "Range": {
+                "Start": 38,
+                "End": 52
+              },
+              "Definition": null
+            },
+            "Kind": 4,
+            "Direction": 1,
+            "Label": "",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 31,
+              "End": 63
+            }
+          }
+        ],
+        "Range": {
+          "Start": 0,
+          "End": 64
+        }
+      }
+    ],
+    "Views": null,
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 64
+    }
+  }
+}

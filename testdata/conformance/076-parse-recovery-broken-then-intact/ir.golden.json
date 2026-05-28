@@ -1,0 +1,54 @@
+{
+  "diagnostics": null,
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": [
+          {
+            "Kind": 1,
+            "Name": "first",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 0,
+              "End": 13
+            }
+          },
+          {
+            "Kind": 1,
+            "Name": "second",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 14,
+              "End": 28
+            }
+          },
+          {
+            "Kind": 1,
+            "Name": "third",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 29,
+              "End": 42
+            }
+          }
+        ],
+        "Boundaries": null,
+        "Edges": null,
+        "Range": {
+          "Start": 0,
+          "End": 43
+        }
+      }
+    ],
+    "Views": null,
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 43
+    }
+  }
+}
