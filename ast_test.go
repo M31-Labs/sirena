@@ -209,6 +209,11 @@ func TestIR_ZeroValue(t *testing.T) {
 		wf.Document != nil || wf.LoadErr != nil {
 		t.Error("WorkspaceFile zero non-zero")
 	}
+
+	var s Symbol
+	if s.Node != nil || s.File != nil || s.QualifiedName != "" {
+		t.Error("Symbol zero non-zero")
+	}
 }
 
 // TestIR_WorkspaceModeString pins every WorkspaceMode constant to its

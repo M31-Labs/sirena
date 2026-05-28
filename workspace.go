@@ -167,6 +167,10 @@ type Workspace struct {
 	// Files is the sorted list of enumerated .sir / .view.sir / .gen.sir
 	// files under Root.
 	Files []*WorkspaceFile
+	// symbols is the workspace-level resolver index, populated lazily on
+	// the first Resolve / ResolveDiagnostics / Touch call. See resolve.go
+	// for the indexing strategy.
+	symbols *symbolTable
 }
 
 // OpenWorkspace walks root for `.sir`, `.view.sir`, `.gen.sir` files and
