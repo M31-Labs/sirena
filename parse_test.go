@@ -72,6 +72,136 @@ func TestParse_BoundaryNested(t *testing.T) {
 	}
 }
 
+func TestParse_Edge_Forward_Typed(t *testing.T) {
+	src := []byte(`api -> db: reads "user records"`)
+	doc, err := sirena.Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(doc.Systems) != 1 {
+		t.Fatalf("Systems: %d", len(doc.Systems))
+	}
+	sys := doc.Systems[0]
+	if len(sys.Edges) != 1 {
+		t.Fatalf("Edges: %d", len(sys.Edges))
+	}
+	e := sys.Edges[0]
+	if e.From != "api" {
+		t.Errorf("From: %q", e.From)
+	}
+	if e.To != "db" {
+		t.Errorf("To: %q", e.To)
+	}
+	if e.Kind != sirena.EdgeKindReads {
+		t.Errorf("Kind: %v", e.Kind)
+	}
+	if e.Direction != sirena.DirForward {
+		t.Errorf("Direction: %v", e.Direction)
+	}
+	if e.Label != "user records" {
+		t.Errorf("Label: %q", e.Label)
+	}
+}
+
+func TestParse_Edge_Reverse(t *testing.T) {
+	src := []byte(`api <- worker`)
+	doc, err := sirena.Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(doc.Systems) != 1 || len(doc.Systems[0].Edges) != 1 {
+		t.Fatalf("expected 1 edge, doc=%+v", doc)
+	}
+	e := doc.Systems[0].Edges[0]
+	if e.From != "api" || e.To != "worker" {
+		t.Errorf("From/To: %q/%q (want api/worker as written)", e.From, e.To)
+	}
+	if e.Direction != sirena.DirReverse {
+		t.Errorf("Direction: %v", e.Direction)
+	}
+	if e.Kind != sirena.EdgeKindFlow {
+		t.Errorf("Kind (untyped): %v", e.Kind)
+	}
+}
+
+func TestParse_Edge_Bidirectional(t *testing.T) {
+	src := []byte(`api <-> peer`)
+	e := sirena.MustParse(src).Systems[0].Edges[0]
+	if e.Direction != sirena.DirBidirectional {
+		t.Errorf("Direction: %v", e.Direction)
+	}
+}
+
+func TestParse_Edge_Untyped_Forward(t *testing.T) {
+	src := []byte(`api -> db`)
+	e := sirena.MustParse(src).Systems[0].Edges[0]
+	if e.Kind != sirena.EdgeKindFlow {
+		t.Errorf("Kind (untyped fallback): %v", e.Kind)
+	}
+	if e.Label != "" {
+		t.Errorf("Label should be empty: %q", e.Label)
+	}
+}
+
+func TestParse_Edge_InsideNestedBoundary(t *testing.T) {
+	// Exercises edge_decl_nested through TWO levels of boundary nesting,
+	// confirming the LALR-state-merge workaround applies cleanly when
+	// edge_decl appears in Repeat at multiple depths.
+	src := []byte(`boundary network "vpc" {
+  service edge
+  boundary trust "pci" {
+    service api
+    database db
+    api -> db: reads "rows"
+  }
+}`)
+	doc, err := sirena.Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	outer := doc.Systems[0].Boundaries[0]
+	inner, ok := outer.Children[1].(*sirena.Boundary)
+	if !ok {
+		t.Fatalf("outer.Children[1] not Boundary: %T", outer.Children[1])
+	}
+	if len(inner.Children) != 3 {
+		t.Fatalf("inner.Children: %d (want 2 elements + 1 edge)", len(inner.Children))
+	}
+	e, ok := inner.Children[2].(*sirena.Edge)
+	if !ok {
+		t.Fatalf("inner.Children[2] should be *Edge, got %T", inner.Children[2])
+	}
+	if e.Kind != sirena.EdgeKindReads || e.Label != "rows" {
+		t.Errorf("Edge: %+v", e)
+	}
+}
+
+func TestParse_Edge_InsideBoundary(t *testing.T) {
+	src := []byte(`boundary trust "pci" {
+  service api
+  database db
+  api -> db: writes
+}`)
+	doc, err := sirena.Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	b := doc.Systems[0].Boundaries[0]
+	if len(b.Children) != 3 {
+		t.Fatalf("Children: %d (want 2 elements + 1 edge)", len(b.Children))
+	}
+	e, ok := b.Children[2].(*sirena.Edge)
+	if !ok {
+		t.Fatalf("Children[2] should be *Edge, got %T", b.Children[2])
+	}
+	if e.Kind != sirena.EdgeKindWrites {
+		t.Errorf("Kind: %v", e.Kind)
+	}
+	if e.From != "api" || e.To != "db" {
+		t.Errorf("From/To: %q/%q", e.From, e.To)
+	}
+}
+
 func TestParse_BoundaryNested_TwoLevels(t *testing.T) {
 	src := []byte(`boundary network "vpc" {
   service edge

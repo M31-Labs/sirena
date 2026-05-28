@@ -122,6 +122,10 @@ func lowerDocument(root *gotreesitter.Node, lang *gotreesitter.Language, src []b
 			if b := lowerBoundary(child, lang, src); b != nil {
 				sys.Boundaries = append(sys.Boundaries, b)
 			}
+		case "edge_decl":
+			if e := lowerEdge(child, lang, src); e != nil {
+				sys.Edges = append(sys.Edges, e)
+			}
 		}
 	}
 
@@ -163,10 +167,50 @@ func lowerBoundary(node *gotreesitter.Node, lang *gotreesitter.Language, src []b
 			if nested := lowerBoundary(child, lang, src); nested != nil {
 				b.Children = append(b.Children, nested)
 			}
+		case "edge_decl":
+			if e := lowerEdge(child, lang, src); e != nil {
+				b.Children = append(b.Children, e)
+			}
 		}
 	}
 
 	return b
+}
+
+// lowerEdge converts a single edge_decl CST node into an *Edge. The CST
+// exposes five named fields: "from" (source IDENT), "arrow" (the literal
+// arrow shape), "to" (destination IDENT), and the optional "kind" and
+// "label". Untyped edges (no kind suffix) default to EdgeKindFlow per the
+// v0.1 spec.
+//
+// Direction semantics: `<-` and `<->` do NOT swap From/To at parse time.
+// The Direction field captures the arrow shape as written so the printer
+// can round-trip byte-for-byte; downstream consumers (resolver, layout)
+// interpret the direction.
+func lowerEdge(node *gotreesitter.Node, lang *gotreesitter.Language, src []byte) *Edge {
+	fromNode := node.ChildByFieldName("from", lang)
+	arrowNode := node.ChildByFieldName("arrow", lang)
+	toNode := node.ChildByFieldName("to", lang)
+	if fromNode == nil || arrowNode == nil || toNode == nil {
+		return nil
+	}
+
+	e := &Edge{
+		From:      nodeText(fromNode, src),
+		To:        nodeText(toNode, src),
+		Direction: directionForArrow(nodeText(arrowNode, src)),
+		Kind:      EdgeKindFlow, // untyped fallback per spec
+		Range:     Range{Start: int(node.StartByte()), End: int(node.EndByte())},
+	}
+
+	if kindNode := node.ChildByFieldName("kind", lang); kindNode != nil {
+		e.Kind = edgeKindForKeyword(nodeText(kindNode, src))
+	}
+	if labelNode := node.ChildByFieldName("label", lang); labelNode != nil {
+		e.Label = decodeStringLiteral(nodeText(labelNode, src))
+	}
+
+	return e
 }
 
 // lowerElement converts a single element_decl CST node into an *Element.

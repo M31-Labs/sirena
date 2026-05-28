@@ -18,13 +18,14 @@ type Document struct {
 type SystemDecl struct {
 	Elements   []*Element
 	Boundaries []*Boundary
+	Edges      []*Edge
 	Range      Range
 }
 
 // Node is the closed sum type for things that can appear as children
-// of a boundary or at top level: *Element and *Boundary today; future
-// tasks add *Edge to this list. The unexported sentinel keeps the
-// surface closed — external packages cannot add new Node variants.
+// of a boundary or at top level: *Element, *Boundary, and *Edge. The
+// unexported sentinel keeps the surface closed — external packages
+// cannot add new Node variants.
 type Node interface {
 	isSirenaNode()
 }
@@ -48,7 +49,7 @@ func (*Element) isSirenaNode() {}
 type Boundary struct {
 	Kind     BoundaryKind
 	Name     string           // declared as a STRING literal, e.g. "pci"
-	Children []Node           // *Element and *Boundary; future: *Edge
+	Children []Node           // *Element, *Boundary, and *Edge
 	Metadata map[string]Value // empty for v0.1; later tasks allow metadata blocks on boundaries
 	Range    Range
 }
@@ -98,6 +99,128 @@ func boundaryKindForKeyword(kw string) BoundaryKind {
 		return BoundaryKindTeam
 	default:
 		return BoundaryKindUnknown
+	}
+}
+
+// Edge is a typed directional relationship between two elements.
+// From and To are *unresolved* identifier names at parse time; the workspace
+// resolver (Phase 5) populates ref bindings. Reverse/bidirectional shorthand
+// (<- and <->) does NOT swap From/To at parse time — Direction carries the
+// arrow shape so the printer round-trips byte-for-byte.
+type Edge struct {
+	From      string // source identifier as written (may be namespaced: "platform.kafka")
+	To        string // destination identifier as written
+	Kind      EdgeKind
+	Direction Direction
+	Label     string           // optional; empty when no label string follows
+	Metadata  map[string]Value // empty for v0.1; later tasks add metadata blocks on edges
+	Range     Range
+}
+
+func (*Edge) isSirenaNode() {}
+
+// EdgeKind enumerates the typed edge verbs. The zero value is reserved as
+// EdgeKindUnknown so misuse surfaces obviously. EdgeKindFlow is the
+// untyped fallback used when an edge is declared without a kind suffix.
+type EdgeKind int
+
+const (
+	// EdgeKindUnknown is the zero value; not a valid edge kind.
+	EdgeKindUnknown EdgeKind = iota
+	EdgeKindCalls
+	EdgeKindReads
+	EdgeKindWrites
+	EdgeKindPublishes
+	EdgeKindSubscribes
+	EdgeKindDependsOn
+	// EdgeKindFlow is the untyped fallback for edges declared without a
+	// kind suffix, e.g. `api -> db`.
+	EdgeKindFlow
+)
+
+// String returns the source keyword for this kind, e.g. "reads".
+func (k EdgeKind) String() string {
+	switch k {
+	case EdgeKindCalls:
+		return "calls"
+	case EdgeKindReads:
+		return "reads"
+	case EdgeKindWrites:
+		return "writes"
+	case EdgeKindPublishes:
+		return "publishes"
+	case EdgeKindSubscribes:
+		return "subscribes"
+	case EdgeKindDependsOn:
+		return "depends_on"
+	case EdgeKindFlow:
+		return "flow"
+	default:
+		return "unknown"
+	}
+}
+
+// edgeKindForKeyword maps a source keyword to its EdgeKind. Returns
+// EdgeKindUnknown if the keyword is not a recognized edge kind.
+func edgeKindForKeyword(kw string) EdgeKind {
+	switch kw {
+	case "calls":
+		return EdgeKindCalls
+	case "reads":
+		return EdgeKindReads
+	case "writes":
+		return EdgeKindWrites
+	case "publishes":
+		return EdgeKindPublishes
+	case "subscribes":
+		return EdgeKindSubscribes
+	case "depends_on":
+		return EdgeKindDependsOn
+	case "flow":
+		return EdgeKindFlow
+	default:
+		return EdgeKindUnknown
+	}
+}
+
+// Direction captures the arrow shape of an edge. `<-` (DirReverse) and
+// `<->` (DirBidirectional) do NOT swap From/To at parse time — the field
+// records the arrow as written so the printer round-trips byte-for-byte.
+type Direction int
+
+const (
+	// DirUnknown is the zero value; not a valid direction.
+	DirUnknown       Direction = iota
+	DirForward                 // "->"
+	DirReverse                 // "<-"
+	DirBidirectional           // "<->"
+)
+
+// String returns the source arrow text for this direction.
+func (d Direction) String() string {
+	switch d {
+	case DirForward:
+		return "->"
+	case DirReverse:
+		return "<-"
+	case DirBidirectional:
+		return "<->"
+	default:
+		return "?"
+	}
+}
+
+// directionForArrow maps the source arrow text to its Direction.
+func directionForArrow(arrow string) Direction {
+	switch arrow {
+	case "->":
+		return DirForward
+	case "<-":
+		return DirReverse
+	case "<->":
+		return DirBidirectional
+	default:
+		return DirUnknown
 	}
 }
 

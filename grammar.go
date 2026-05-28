@@ -4,14 +4,15 @@ import "github.com/odvcencio/gotreesitter/grammargen"
 
 // SirenaGrammar returns the v0.1 sirena grammar.
 //
-// The grammar covers the minimum surface required by Phase 2, Tasks 3-4:
-// element declarations with optional metadata blocks, and typed boundary
-// containers that may nest elements and further boundaries. Later tasks
-// in Phase 2 extend this with edges, views, and overrides.
+// The grammar covers the minimum surface required by Phase 2, Tasks 3-5:
+// element declarations with optional metadata blocks, typed boundary
+// containers that may nest elements and further boundaries, and typed
+// directed edges between elements. Later tasks in Phase 2 extend this
+// with views and overrides.
 //
 // Grammar (informal EBNF):
 //
-//	source_file     → (element_decl | boundary_decl)*
+//	source_file     → (element_decl | boundary_decl | edge_decl)*
 //	element_decl    → kind_keyword IDENT metadata_block?
 //	kind_keyword    → "service" | "database" | "queue" | "cache" | "job"
 //	                | "external" | "client" | "gateway" | "node"
@@ -21,7 +22,11 @@ import "github.com/odvcencio/gotreesitter/grammargen"
 //	list            → "[" value ("," value)* "]"
 //	boundary_decl   → "boundary" boundary_kind STRING boundary_block
 //	boundary_kind   → "trust" | "network" | "deployment" | "team"
-//	boundary_block  → "{" (element_decl | boundary_decl)* "}"
+//	boundary_block  → "{" (element_decl | boundary_decl | edge_decl)* "}"
+//	edge_decl       → IDENT arrow IDENT (":" edge_kind STRING?)?
+//	arrow           → "->" | "<-" | "<->"
+//	edge_kind       → "calls" | "reads" | "writes" | "publishes"
+//	                | "subscribes" | "depends_on" | "flow"
 //
 // Whitespace (including newlines) and comments are extras. Comments are
 // not yet defined; TODO(task-N): comments lands when the comment lint is
@@ -29,10 +34,11 @@ import "github.com/odvcencio/gotreesitter/grammargen"
 func SirenaGrammar() *grammargen.Grammar {
 	g := grammargen.NewGrammar("sirena")
 
-	// source_file → (element_decl | boundary_decl)*
+	// source_file → (element_decl | boundary_decl | edge_decl)*
 	g.Define("source_file", grammargen.Repeat(grammargen.Choice(
 		grammargen.Sym("element_decl"),
 		grammargen.Sym("boundary_decl"),
+		grammargen.Sym("edge_decl"),
 	)))
 
 	// element_decl → kind_keyword IDENT metadata_block?
@@ -86,19 +92,72 @@ func SirenaGrammar() *grammargen.Grammar {
 		grammargen.Str("team"),
 	))
 
-	// boundary_block → "{" (element_decl | boundary_decl)* "}"
+	// boundary_block → "{" (element_decl | boundary_decl | edge_decl)* "}"
 	//
 	// The boundary_decl reference inside the block is routed through the
 	// boundary_decl_nested sibling rule (aliased back to "boundary_decl")
 	// to avoid the LR table merging boundary_decl's two repeat contexts.
-	// See the comment on boundary_decl_nested above.
+	// edge_decl is similarly routed through edge_decl_nested for the same
+	// reason — see the comments on boundary_decl_nested and edge_decl_nested.
 	g.Define("boundary_block", grammargen.Seq(
 		grammargen.Str("{"),
 		grammargen.Repeat(grammargen.Choice(
 			grammargen.Sym("element_decl"),
 			grammargen.Alias(grammargen.Sym("boundary_decl_nested"), "boundary_decl", true),
+			grammargen.Alias(grammargen.Sym("edge_decl_nested"), "edge_decl", true),
 		)),
 		grammargen.Str("}"),
+	))
+
+	// edge_decl → IDENT arrow IDENT (":" edge_kind STRING?)?
+	//
+	// TODO(task-7): accept qualified_ident (IDENT.IDENT) for namespaced
+	// endpoints once the import grammar lands.
+	g.Define("edge_decl", grammargen.Seq(
+		grammargen.Field("from", grammargen.Sym("identifier")),
+		grammargen.Field("arrow", grammargen.Sym("arrow")),
+		grammargen.Field("to", grammargen.Sym("identifier")),
+		grammargen.Optional(grammargen.Seq(
+			grammargen.Str(":"),
+			grammargen.Field("kind", grammargen.Sym("edge_kind")),
+			grammargen.Optional(grammargen.Field("label", grammargen.Sym("string"))),
+		)),
+	))
+
+	// edge_decl_nested is a structurally identical sibling of edge_decl,
+	// used only inside boundary_block. The duplication is the same LALR
+	// workaround applied to boundary_decl in Task 4 — when the same
+	// nonterminal appears in Repeat at multiple nesting levels, grammargen
+	// v0.19.1 silently merges LR states and nested parses fail. An Alias
+	// on the reference rewrites the CST node type back to "edge_decl" so
+	// downstream lowering does not need to special-case the sibling.
+	g.Define("edge_decl_nested", grammargen.Seq(
+		grammargen.Field("from", grammargen.Sym("identifier")),
+		grammargen.Field("arrow", grammargen.Sym("arrow")),
+		grammargen.Field("to", grammargen.Sym("identifier")),
+		grammargen.Optional(grammargen.Seq(
+			grammargen.Str(":"),
+			grammargen.Field("kind", grammargen.Sym("edge_kind")),
+			grammargen.Optional(grammargen.Field("label", grammargen.Sym("string"))),
+		)),
+	))
+
+	// arrow → "->" | "<-" | "<->"
+	g.Define("arrow", grammargen.Choice(
+		grammargen.Str("<->"),
+		grammargen.Str("->"),
+		grammargen.Str("<-"),
+	))
+
+	// edge_kind → one of the typed edge verbs, or the untyped fallback.
+	g.Define("edge_kind", grammargen.Choice(
+		grammargen.Str("calls"),
+		grammargen.Str("reads"),
+		grammargen.Str("writes"),
+		grammargen.Str("publishes"),
+		grammargen.Str("subscribes"),
+		grammargen.Str("depends_on"),
+		grammargen.Str("flow"),
 	))
 
 	// metadata_block → "{" pair* "}"
