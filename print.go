@@ -256,13 +256,13 @@ func (p *printer) writeEdge(e *Edge) error {
 	return nil
 }
 
-// writeView emits a view declaration: title, preset, theme, include
-// selectors, expand/collapse lists, layout sub-block, budget sub-block,
-// and any forward-compatible metadata pairs. Recognized directives are
+// writeView emits a view declaration: title, preset, include selectors,
+// expand/collapse lists, theme, layout sub-block, budget sub-block, and
+// any forward-compatible metadata pairs. Recognized directives are
 // emitted in a fixed canonical order (independent of source order) so
 // reprinting is deterministic.
 //
-// Order: title, preset, theme, include, expand, collapse, layout,
+// Order: title, preset, include, expand, collapse, theme, layout,
 // budget, then any other metadata pairs in sorted key order.
 func (p *printer) writeView(v *ViewDecl) error {
 	p.indent()
@@ -294,12 +294,6 @@ func (p *printer) writeView(v *ViewDecl) error {
 		p.buf.WriteString(v.Preset)
 		p.buf.WriteString("\n")
 	}
-	if v.Theme != "" {
-		p.indent()
-		p.buf.WriteString("theme: ")
-		p.buf.WriteString(v.Theme)
-		p.buf.WriteString("\n")
-	}
 	if len(v.Include) > 0 {
 		p.writeSelectorList(v.Include)
 	}
@@ -313,6 +307,12 @@ func (p *printer) writeView(v *ViewDecl) error {
 		p.indent()
 		p.buf.WriteString("collapse: ")
 		p.writeNameList(v.Collapse)
+		p.buf.WriteString("\n")
+	}
+	if v.Theme != "" {
+		p.indent()
+		p.buf.WriteString("theme: ")
+		p.buf.WriteString(v.Theme)
 		p.buf.WriteString("\n")
 	}
 	if v.Layout != nil {
@@ -394,13 +394,21 @@ func (p *printer) writeNameList(names []string) {
 		if i > 0 {
 			p.buf.WriteString(", ")
 		}
-		if isBareIdent(n) {
-			p.buf.WriteString(n)
-		} else {
-			p.writeStringLiteral(n)
-		}
+		p.writeBareOrQuoted(n)
 	}
 	p.buf.WriteString("]")
+}
+
+// writeBareOrQuoted writes name as a bare identifier when it matches the
+// identifier syntax sirena's lexer accepts; otherwise quotes it. Used
+// wherever the IR stores a name that may have come from either a bare
+// or quoted source token — pin keys, pin values, and name lists.
+func (p *printer) writeBareOrQuoted(name string) {
+	if isBareIdent(name) {
+		p.buf.WriteString(name)
+	} else {
+		p.writeStringLiteral(name)
+	}
 }
 
 // writeLayout emits the layout sub-block with direction first, then the
@@ -428,9 +436,13 @@ func (p *printer) writeLayout(l *LayoutHints) error {
 			if i > 0 {
 				p.buf.WriteString(", ")
 			}
+			// Pin keys are typed as STRING in the grammar (pin_pair), so we
+			// always quote them. Values are IDENT in the grammar, so we
+			// route them through writeBareOrQuoted for symmetry with the
+			// other bare-or-quoted name surfaces.
 			p.writeStringLiteral(k)
 			p.buf.WriteString(": ")
-			p.buf.WriteString(l.Pin[k])
+			p.writeBareOrQuoted(l.Pin[k])
 		}
 		p.buf.WriteString(" }\n")
 	}

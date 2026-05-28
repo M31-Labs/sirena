@@ -789,12 +789,22 @@ func nodeText(node *gotreesitter.Node, src []byte) string {
 	return string(src[start:end])
 }
 
-// decodeStringLiteral strips the surrounding quotes and resolves the
-// single-character backslash escapes recognized by the grammar. Anything
-// not recognized passes through verbatim.
+// decodeStringLiteral strips the surrounding quotes and resolves the Go
+// backslash escape set produced by strconv.Quote — including \xHH, \uHHHH,
+// \UHHHHHHHH, and \NNN octal forms — so values round-trip symmetrically
+// with the printer's writeStringLiteral.
+//
+// strconv.Unquote handles every escape the printer can emit. If unquoting
+// fails (e.g. an unsupported escape from a hand-written source), we fall
+// back to a permissive scan that mirrors the historical behavior: known
+// single-char escapes are decoded, unknown escapes pass the trailing byte
+// through verbatim.
 func decodeStringLiteral(lit string) string {
 	if len(lit) < 2 || lit[0] != '"' || lit[len(lit)-1] != '"' {
 		return lit
+	}
+	if s, err := strconv.Unquote(lit); err == nil {
+		return s
 	}
 	inner := lit[1 : len(lit)-1]
 	if !strings.Contains(inner, `\`) {

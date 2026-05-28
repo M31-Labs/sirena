@@ -523,6 +523,88 @@ func TestPrint_StringEscaping_BackslashAlone(t *testing.T) {
 	}
 }
 
+func TestPrint_StringEscaping_HexAndUnicode(t *testing.T) {
+	// Build IR programmatically to bypass any parser limitations on input.
+	doc := &sirena.Document{
+		Systems: []*sirena.SystemDecl{{
+			Elements: []*sirena.Element{{
+				Kind: sirena.ElementKindService,
+				Name: "api",
+				Metadata: map[string]sirena.Value{
+					"del":     sirena.String{Value: "\x7f"},          // DEL byte
+					"bell":    sirena.String{Value: "\a"},            // bell char (\x07)
+					"ucs":     sirena.String{Value: "café — résumé"}, // multi-byte UTF-8
+					"smileys": sirena.String{Value: "😀🎉"},            // multi-byte runes
+				},
+			}},
+		}},
+	}
+	out, err := sirena.Print(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	doc2, err := sirena.Parse(out)
+	if err != nil {
+		t.Fatalf("reparse: %v\noutput was:\n%s", err, string(out))
+	}
+
+	md := doc2.Systems[0].Elements[0].Metadata
+	for k, want := range map[string]string{
+		"del":     "\x7f",
+		"bell":    "\a",
+		"ucs":     "café — résumé",
+		"smileys": "😀🎉",
+	} {
+		got, ok := md[k].(sirena.String)
+		if !ok {
+			t.Errorf("%s: not a String: %#v", k, md[k])
+			continue
+		}
+		if got.Value != want {
+			t.Errorf("%s round-trip lost: got %q want %q", k, got.Value, want)
+		}
+	}
+}
+
+func TestPrint_View_DirectiveOrder(t *testing.T) {
+	src := []byte(`view "v" {
+  budget { nodes: 10 }
+  theme: earth
+  preset: default
+  collapse: ["x"]
+  layout { direction: top-down }
+  expand: ["y"]
+  include: [service "api"]
+  title: "T"
+}`)
+	doc, err := sirena.Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	out, err := sirena.Print(doc)
+	if err != nil {
+		t.Fatalf("Print: %v", err)
+	}
+	s := string(out)
+	idx := func(needle string) int { return strings.Index(s, needle) }
+	order := []string{`title:`, `preset:`, `include:`, `expand:`, `collapse:`, `theme:`, `layout`, `budget`}
+	var positions []int
+	for _, n := range order {
+		i := idx(n)
+		if i < 0 {
+			t.Fatalf("missing %s in output:\n%s", n, s)
+		}
+		positions = append(positions, i)
+	}
+	for i := 1; i < len(positions); i++ {
+		if positions[i] < positions[i-1] {
+			t.Errorf("directive %q appears before %q in output (positions %d < %d):\n%s",
+				order[i], order[i-1], positions[i], positions[i-1], s)
+		}
+	}
+}
+
 // --- General round-trip exercise on existing parse-test inputs ----------
 
 func TestPrint_RoundTrip_KnownInputs(t *testing.T) {
