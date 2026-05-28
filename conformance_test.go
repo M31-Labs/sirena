@@ -10,6 +10,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+
 	"m31labs.dev/sirena"
 )
 
@@ -150,5 +153,59 @@ func TestConformance_IRGoldenPerCase(t *testing.T) {
 
 	if checked == 0 {
 		t.Skip("no conformance cases with ir.golden.json yet — corpus is filled in Phase 12")
+	}
+}
+
+// TestConformance_RoundTripPerCase asserts the round-trip law across the
+// entire corpus: Parse(Print(Parse(input))) is structurally equal to
+// Parse(input) for every case directory's input.sir. Range fields are
+// ignored because reprinting shifts byte offsets but should preserve
+// structure; Document's unexported parseDiagnostics is ignored because
+// it's owned by the parser and is not externally constructable.
+//
+// This is Task 41's gate: the round-trip law extended across the entire
+// conformance corpus, not just the hand-written samples in
+// TestRoundTrip_Law.
+func TestConformance_RoundTripPerCase(t *testing.T) {
+	entries, err := os.ReadDir(corpusDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	checked := 0
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		e := e
+		t.Run(e.Name(), func(t *testing.T) {
+			input, err := os.ReadFile(filepath.Join(corpusDir, e.Name(), "input.sir"))
+			if err != nil {
+				t.Fatalf("read input.sir: %v", err)
+			}
+			doc1, err := sirena.Parse(input)
+			if err != nil {
+				t.Fatalf("Parse(input): %v", err)
+			}
+			printed, err := sirena.Print(doc1)
+			if err != nil {
+				t.Fatalf("Print: %v", err)
+			}
+			doc2, err := sirena.Parse(printed)
+			if err != nil {
+				t.Fatalf("re-Parse failed: %v\nprinted output:\n%s", err, string(printed))
+			}
+			if diff := cmp.Diff(doc1, doc2,
+				cmpopts.IgnoreTypes(sirena.Range{}),
+				cmpopts.IgnoreUnexported(sirena.Document{}),
+			); diff != "" {
+				t.Errorf("round-trip mismatch:\n%s\nprinted output:\n%s", diff, string(printed))
+			}
+		})
+		checked++
+	}
+
+	if checked == 0 {
+		t.Skip("no conformance cases yet")
 	}
 }
