@@ -1,0 +1,34 @@
+{
+  "diagnostics": null,
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": [
+          {
+            "Kind": 3,
+            "Name": "events",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 0,
+              "End": 12
+            }
+          }
+        ],
+        "Boundaries": null,
+        "Edges": null,
+        "Range": {
+          "Start": 0,
+          "End": 13
+        }
+      }
+    ],
+    "Views": null,
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 13
+    }
+  }
+}

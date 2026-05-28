@@ -1,0 +1,5 @@
+service worker
+
+queue events
+
+worker -> events: subscribes

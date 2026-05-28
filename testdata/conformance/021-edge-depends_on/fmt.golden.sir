@@ -1,0 +1,5 @@
+service api
+
+service auth
+
+api -> auth: depends_on

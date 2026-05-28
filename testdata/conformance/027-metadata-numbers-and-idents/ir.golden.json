@@ -1,0 +1,63 @@
+{
+  "diagnostics": null,
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": [
+          {
+            "Kind": 1,
+            "Name": "api",
+            "Metadata": {
+              "port": {
+                "Value": 8080,
+                "Range": {
+                  "Start": 36,
+                  "End": 40
+                }
+              },
+              "replicas": {
+                "Value": 3,
+                "Range": {
+                  "Start": 26,
+                  "End": 27
+                }
+              },
+              "status": {
+                "Value": "active",
+                "Range": {
+                  "Start": 51,
+                  "End": 57
+                }
+              },
+              "tier": {
+                "Value": "critical",
+                "Range": {
+                  "Start": 66,
+                  "End": 74
+                }
+              }
+            },
+            "Override": null,
+            "Range": {
+              "Start": 0,
+              "End": 76
+            }
+          }
+        ],
+        "Boundaries": null,
+        "Edges": null,
+        "Range": {
+          "Start": 0,
+          "End": 77
+        }
+      }
+    ],
+    "Views": null,
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 77
+    }
+  }
+}

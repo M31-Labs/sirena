@@ -1,0 +1,3 @@
+boundary trust "pci" {
+  service api
+}

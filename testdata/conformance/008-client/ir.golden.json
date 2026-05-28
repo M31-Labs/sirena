@@ -1,0 +1,34 @@
+{
+  "diagnostics": null,
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": [
+          {
+            "Kind": 7,
+            "Name": "mobile_app",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 0,
+              "End": 17
+            }
+          }
+        ],
+        "Boundaries": null,
+        "Edges": null,
+        "Range": {
+          "Start": 0,
+          "End": 18
+        }
+      }
+    ],
+    "Views": null,
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 18
+    }
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "diagnostics": null,
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": null,
+        "Boundaries": [
+          {
+            "Kind": 4,
+            "Name": "platform",
+            "Children": [
+              {
+                "Kind": 1,
+                "Name": "api",
+                "Metadata": null,
+                "Override": null,
+                "Range": {
+                  "Start": 29,
+                  "End": 40
+                }
+              }
+            ],
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 0,
+              "End": 42
+            }
+          }
+        ],
+        "Edges": null,
+        "Range": {
+          "Start": 0,
+          "End": 43
+        }
+      }
+    ],
+    "Views": null,
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 43
+    }
+  }
+}

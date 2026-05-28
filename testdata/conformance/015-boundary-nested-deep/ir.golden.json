@@ -1,0 +1,70 @@
+{
+  "diagnostics": null,
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": null,
+        "Boundaries": [
+          {
+            "Kind": 1,
+            "Name": "outer",
+            "Children": [
+              {
+                "Kind": 2,
+                "Name": "middle",
+                "Children": [
+                  {
+                    "Kind": 4,
+                    "Name": "inner",
+                    "Children": [
+                      {
+                        "Kind": 1,
+                        "Name": "api",
+                        "Metadata": null,
+                        "Override": null,
+                        "Range": {
+                          "Start": 89,
+                          "End": 100
+                        }
+                      }
+                    ],
+                    "Metadata": null,
+                    "Override": null,
+                    "Range": {
+                      "Start": 59,
+                      "End": 106
+                    }
+                  }
+                ],
+                "Metadata": null,
+                "Override": null,
+                "Range": {
+                  "Start": 27,
+                  "End": 110
+                }
+              }
+            ],
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 0,
+              "End": 112
+            }
+          }
+        ],
+        "Edges": null,
+        "Range": {
+          "Start": 0,
+          "End": 113
+        }
+      }
+    ],
+    "Views": null,
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 113
+    }
+  }
+}

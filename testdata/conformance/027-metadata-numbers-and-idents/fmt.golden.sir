@@ -1,0 +1,6 @@
+service api {
+  port: 8080
+  replicas: 3
+  status: active
+  tier: critical
+}

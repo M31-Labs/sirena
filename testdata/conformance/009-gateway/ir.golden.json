@@ -1,0 +1,34 @@
+{
+  "diagnostics": null,
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": [
+          {
+            "Kind": 8,
+            "Name": "edge_proxy",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 0,
+              "End": 18
+            }
+          }
+        ],
+        "Boundaries": null,
+        "Edges": null,
+        "Range": {
+          "Start": 0,
+          "End": 19
+        }
+      }
+    ],
+    "Views": null,
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 19
+    }
+  }
+}

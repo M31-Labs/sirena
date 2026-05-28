@@ -1,0 +1,34 @@
+{
+  "diagnostics": null,
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": [
+          {
+            "Kind": 2,
+            "Name": "db",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 0,
+              "End": 11
+            }
+          }
+        ],
+        "Boundaries": null,
+        "Edges": null,
+        "Range": {
+          "Start": 0,
+          "End": 12
+        }
+      }
+    ],
+    "Views": null,
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 12
+    }
+  }
+}

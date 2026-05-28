@@ -1,0 +1,76 @@
+{
+  "diagnostics": null,
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": [
+          {
+            "Kind": 1,
+            "Name": "a",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 0,
+              "End": 9
+            }
+          },
+          {
+            "Kind": 1,
+            "Name": "b",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 10,
+              "End": 19
+            }
+          }
+        ],
+        "Boundaries": null,
+        "Edges": [
+          {
+            "From": "a",
+            "To": "b",
+            "FromRef": {
+              "Namespace": "",
+              "Name": "a",
+              "Range": {
+                "Start": 20,
+                "End": 21
+              },
+              "Definition": null
+            },
+            "ToRef": {
+              "Namespace": "",
+              "Name": "b",
+              "Range": {
+                "Start": 25,
+                "End": 26
+              },
+              "Definition": null
+            },
+            "Kind": 7,
+            "Direction": 1,
+            "Label": "",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 20,
+              "End": 26
+            }
+          }
+        ],
+        "Range": {
+          "Start": 0,
+          "End": 27
+        }
+      }
+    ],
+    "Views": null,
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 27
+    }
+  }
+}

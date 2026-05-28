@@ -1,0 +1,130 @@
+{
+  "diagnostics": null,
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": [
+          {
+            "Kind": 1,
+            "Name": "api",
+            "Metadata": {
+              "mixed": {
+                "Values": [
+                  {
+                    "Value": "alpha",
+                    "Range": {
+                      "Start": 102,
+                      "End": 109
+                    }
+                  },
+                  {
+                    "Value": 1,
+                    "Range": {
+                      "Start": 111,
+                      "End": 112
+                    }
+                  },
+                  {
+                    "Value": "beta",
+                    "Range": {
+                      "Start": 114,
+                      "End": 118
+                    }
+                  }
+                ],
+                "Range": {
+                  "Start": 101,
+                  "End": 119
+                }
+              },
+              "ports": {
+                "Values": [
+                  {
+                    "Value": 80,
+                    "Range": {
+                      "Start": 49,
+                      "End": 51
+                    }
+                  },
+                  {
+                    "Value": 443,
+                    "Range": {
+                      "Start": 53,
+                      "End": 56
+                    }
+                  }
+                ],
+                "Range": {
+                  "Start": 48,
+                  "End": 57
+                }
+              },
+              "regions": {
+                "Values": [
+                  {
+                    "Value": "us-east",
+                    "Range": {
+                      "Start": 70,
+                      "End": 79
+                    }
+                  },
+                  {
+                    "Value": "eu-west",
+                    "Range": {
+                      "Start": 81,
+                      "End": 90
+                    }
+                  }
+                ],
+                "Range": {
+                  "Start": 69,
+                  "End": 91
+                }
+              },
+              "tags": {
+                "Values": [
+                  {
+                    "Value": "stateless",
+                    "Range": {
+                      "Start": 23,
+                      "End": 32
+                    }
+                  },
+                  {
+                    "Value": "hot",
+                    "Range": {
+                      "Start": 34,
+                      "End": 37
+                    }
+                  }
+                ],
+                "Range": {
+                  "Start": 22,
+                  "End": 38
+                }
+              }
+            },
+            "Override": null,
+            "Range": {
+              "Start": 0,
+              "End": 121
+            }
+          }
+        ],
+        "Boundaries": null,
+        "Edges": null,
+        "Range": {
+          "Start": 0,
+          "End": 122
+        }
+      }
+    ],
+    "Views": null,
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 122
+    }
+  }
+}

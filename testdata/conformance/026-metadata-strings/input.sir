@@ -1,0 +1,5 @@
+service api {
+  label: "Public API"
+  description: "Edge-facing HTTP service"
+  owner: "platform-team"
+}

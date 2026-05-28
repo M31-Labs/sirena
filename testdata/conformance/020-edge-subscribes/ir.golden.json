@@ -1,0 +1,76 @@
+{
+  "diagnostics": null,
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": [
+          {
+            "Kind": 1,
+            "Name": "worker",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 0,
+              "End": 14
+            }
+          },
+          {
+            "Kind": 3,
+            "Name": "events",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 15,
+              "End": 27
+            }
+          }
+        ],
+        "Boundaries": null,
+        "Edges": [
+          {
+            "From": "worker",
+            "To": "events",
+            "FromRef": {
+              "Namespace": "",
+              "Name": "worker",
+              "Range": {
+                "Start": 28,
+                "End": 34
+              },
+              "Definition": null
+            },
+            "ToRef": {
+              "Namespace": "",
+              "Name": "events",
+              "Range": {
+                "Start": 38,
+                "End": 44
+              },
+              "Definition": null
+            },
+            "Kind": 5,
+            "Direction": 1,
+            "Label": "",
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 28,
+              "End": 56
+            }
+          }
+        ],
+        "Range": {
+          "Start": 0,
+          "End": 57
+        }
+      }
+    ],
+    "Views": null,
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 57
+    }
+  }
+}

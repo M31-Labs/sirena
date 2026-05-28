@@ -4,6 +4,8 @@
 package sirena_test
 
 import (
+	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -84,5 +86,69 @@ func TestConformance_FormatDeterminism(t *testing.T) {
 
 	if checked == 0 {
 		t.Skip("no conformance cases with fmt.golden.sir yet — corpus is filled in Phase 12")
+	}
+}
+
+// TestConformance_IRGoldenPerCase asserts that for every case directory
+// under testdata/conformance/, the JSON encoding of Parse(input.sir) +
+// Diagnostics() matches ir.golden.json byte-for-byte. The encoding
+// shape mirrors `sirena parse --json` (cmd/sirena/cmd_parse.go) so the
+// regen script and the runner stay aligned.
+//
+// Cases without an ir.golden.json yet are silently skipped, mirroring
+// the format-determinism runner's tolerance during corpus build-out.
+func TestConformance_IRGoldenPerCase(t *testing.T) {
+	entries, err := os.ReadDir(corpusDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	checked := 0
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		caseDir := filepath.Join(corpusDir, e.Name())
+		inputPath := filepath.Join(caseDir, "input.sir")
+		goldenPath := filepath.Join(caseDir, "ir.golden.json")
+
+		input, err := os.ReadFile(inputPath)
+		if err != nil {
+			t.Errorf("%s: read input.sir: %v", e.Name(), err)
+			continue
+		}
+		golden, err := os.ReadFile(goldenPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			t.Errorf("%s: read ir.golden.json: %v", e.Name(), err)
+			continue
+		}
+		doc, err := sirena.Parse(input)
+		if err != nil {
+			t.Errorf("%s: Parse: %v", e.Name(), err)
+			continue
+		}
+		out := map[string]any{
+			"document":    doc,
+			"diagnostics": doc.Diagnostics(),
+		}
+		var buf bytes.Buffer
+		enc := json.NewEncoder(&buf)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(out); err != nil {
+			t.Errorf("%s: encode: %v", e.Name(), err)
+			continue
+		}
+		if !bytes.Equal(buf.Bytes(), golden) {
+			t.Errorf("%s: IR JSON differs from ir.golden.json\n--- got ---\n%s\n--- want ---\n%s",
+				e.Name(), buf.String(), string(golden))
+		}
+		checked++
+	}
+
+	if checked == 0 {
+		t.Skip("no conformance cases with ir.golden.json yet — corpus is filled in Phase 12")
 	}
 }

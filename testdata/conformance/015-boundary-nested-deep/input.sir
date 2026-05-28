@@ -1,0 +1,7 @@
+boundary trust "outer" {
+  boundary network "middle" {
+    boundary team "inner" {
+      service api
+    }
+  }
+}

@@ -1,0 +1,6 @@
+service api {
+  tags: [stateless, hot]
+  ports: [80, 443]
+  regions: ["us-east", "eu-west"]
+  mixed: ["alpha", 1, beta]
+}

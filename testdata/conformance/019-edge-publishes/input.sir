@@ -1,0 +1,3 @@
+service api
+queue events
+api -> events: publishes

@@ -20,3 +20,5 @@ go.work.sum
 
 # Build output
 dist/
+bin/
+/sirena

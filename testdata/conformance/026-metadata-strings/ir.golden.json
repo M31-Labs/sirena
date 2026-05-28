@@ -1,0 +1,56 @@
+{
+  "diagnostics": null,
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": [
+          {
+            "Kind": 1,
+            "Name": "api",
+            "Metadata": {
+              "description": {
+                "Value": "Edge-facing HTTP service",
+                "Range": {
+                  "Start": 51,
+                  "End": 77
+                }
+              },
+              "label": {
+                "Value": "Public API",
+                "Range": {
+                  "Start": 23,
+                  "End": 35
+                }
+              },
+              "owner": {
+                "Value": "platform-team",
+                "Range": {
+                  "Start": 87,
+                  "End": 102
+                }
+              }
+            },
+            "Override": null,
+            "Range": {
+              "Start": 0,
+              "End": 104
+            }
+          }
+        ],
+        "Boundaries": null,
+        "Edges": null,
+        "Range": {
+          "Start": 0,
+          "End": 105
+        }
+      }
+    ],
+    "Views": null,
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 105
+    }
+  }
+}
