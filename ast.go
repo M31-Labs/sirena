@@ -12,7 +12,12 @@ type Document struct {
 	Imports []*Import
 	Systems []*SystemDecl
 	Views   []*ViewDecl
-	Range   Range
+	// Manifest carries the workspace-level defaults loaded from
+	// sirena.toml. It is nil unless the document was produced via a
+	// workspace operation that loaded a manifest; Parse, which only
+	// sees a single .sir file body, never populates it.
+	Manifest *Manifest
+	Range    Range
 }
 
 // Import declares that another sirena source file's symbols should be

@@ -18,6 +18,9 @@ func TestIR_ZeroValue(t *testing.T) {
 	if d.Views != nil {
 		t.Error("Document.Views zero value not nil")
 	}
+	if d.Manifest != nil {
+		t.Error("Document.Manifest zero value not nil")
+	}
 	if d.Range.Start != 0 || d.Range.End != 0 {
 		t.Errorf("Document.Range zero = %+v, want {0 0}", d.Range)
 	}
