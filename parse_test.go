@@ -202,6 +202,154 @@ func TestParse_Edge_InsideBoundary(t *testing.T) {
 	}
 }
 
+func TestParse_ElementMetadata_FullCoverage(t *testing.T) {
+	src := []byte(`service api {
+  label: "API Service"
+  owner: "team:platform"
+  weight: 42
+  enabled: yes
+  tags: [stateless, edge, "v2"]
+}`)
+	doc, err := sirena.Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(doc.Systems) != 1 || len(doc.Systems[0].Elements) != 1 {
+		t.Fatalf("expected 1 element, doc=%+v", doc)
+	}
+	md := doc.Systems[0].Elements[0].Metadata
+	if md == nil {
+		t.Fatal("Metadata nil")
+	}
+	if s, ok := md["label"].(sirena.String); !ok || s.Value != "API Service" {
+		t.Errorf("label: %#v", md["label"])
+	}
+	if s, ok := md["owner"].(sirena.String); !ok || s.Value != "team:platform" {
+		t.Errorf("owner: %#v", md["owner"])
+	}
+	if n, ok := md["weight"].(sirena.Number); !ok || n.Value != 42 {
+		t.Errorf("weight: %#v", md["weight"])
+	}
+	if id, ok := md["enabled"].(sirena.Ident); !ok || id.Value != "yes" {
+		t.Errorf("enabled: %#v", md["enabled"])
+	}
+	list, ok := md["tags"].(sirena.List)
+	if !ok || len(list.Values) != 3 {
+		t.Fatalf("tags: %#v", md["tags"])
+	}
+	if id, ok := list.Values[0].(sirena.Ident); !ok || id.Value != "stateless" {
+		t.Errorf("tags[0]: %#v", list.Values[0])
+	}
+	if id, ok := list.Values[1].(sirena.Ident); !ok || id.Value != "edge" {
+		t.Errorf("tags[1]: %#v", list.Values[1])
+	}
+	if s, ok := list.Values[2].(sirena.String); !ok || s.Value != "v2" {
+		t.Errorf("tags[2]: %#v", list.Values[2])
+	}
+}
+
+func TestParse_BoundaryMetadata(t *testing.T) {
+	src := []byte(`boundary trust "pci" {
+  owner: "team:platform"
+  tier: 1
+} {
+  service api
+}`)
+	doc, err := sirena.Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(doc.Systems) != 1 || len(doc.Systems[0].Boundaries) != 1 {
+		t.Fatalf("expected 1 boundary, doc=%+v", doc)
+	}
+	b := doc.Systems[0].Boundaries[0]
+	if b.Metadata == nil {
+		t.Fatal("boundary.Metadata nil")
+	}
+	if s, ok := b.Metadata["owner"].(sirena.String); !ok || s.Value != "team:platform" {
+		t.Errorf("boundary owner: %#v", b.Metadata["owner"])
+	}
+	if n, ok := b.Metadata["tier"].(sirena.Number); !ok || n.Value != 1 {
+		t.Errorf("boundary tier: %#v", b.Metadata["tier"])
+	}
+	if len(b.Children) != 1 {
+		t.Errorf("boundary children: %d", len(b.Children))
+	}
+	if e, ok := b.Children[0].(*sirena.Element); !ok || e.Name != "api" {
+		t.Errorf("Children[0]: %#v", b.Children[0])
+	}
+}
+
+func TestParse_BoundaryMetadata_OmittedStillParses(t *testing.T) {
+	// Sanity check that a boundary with no metadata block still works after
+	// the optional metadata block is added to the grammar.
+	src := []byte(`boundary trust "pci" {
+  service api
+}`)
+	doc, err := sirena.Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	b := doc.Systems[0].Boundaries[0]
+	if b.Metadata != nil {
+		t.Errorf("boundary.Metadata should be nil, got %#v", b.Metadata)
+	}
+	if len(b.Children) != 1 {
+		t.Errorf("boundary children: %d", len(b.Children))
+	}
+}
+
+func TestParse_EdgeMetadata(t *testing.T) {
+	src := []byte(`api -> db: writes "user records" {
+  rate: 100
+  retry: yes
+}`)
+	doc, err := sirena.Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(doc.Systems) != 1 || len(doc.Systems[0].Edges) != 1 {
+		t.Fatalf("expected 1 edge, doc=%+v", doc)
+	}
+	e := doc.Systems[0].Edges[0]
+	if e.Metadata == nil {
+		t.Fatal("edge.Metadata nil")
+	}
+	if n, ok := e.Metadata["rate"].(sirena.Number); !ok || n.Value != 100 {
+		t.Errorf("edge rate: %#v", e.Metadata["rate"])
+	}
+	if id, ok := e.Metadata["retry"].(sirena.Ident); !ok || id.Value != "yes" {
+		t.Errorf("edge retry: %#v", e.Metadata["retry"])
+	}
+	if e.Label != "user records" {
+		t.Errorf("Label: %q", e.Label)
+	}
+	if e.Kind != sirena.EdgeKindWrites {
+		t.Errorf("Kind: %v", e.Kind)
+	}
+}
+
+func TestParse_EdgeMetadata_NoLabel(t *testing.T) {
+	// Edge metadata is allowed without a label/kind suffix too.
+	src := []byte(`api -> db {
+  rate: 50
+}`)
+	doc, err := sirena.Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	e := doc.Systems[0].Edges[0]
+	if e.Metadata == nil {
+		t.Fatal("edge.Metadata nil")
+	}
+	if n, ok := e.Metadata["rate"].(sirena.Number); !ok || n.Value != 50 {
+		t.Errorf("edge rate: %#v", e.Metadata["rate"])
+	}
+	if e.Kind != sirena.EdgeKindFlow {
+		t.Errorf("Kind (untyped): %v", e.Kind)
+	}
+}
+
 func TestParse_BoundaryNested_TwoLevels(t *testing.T) {
 	src := []byte(`boundary network "vpc" {
   service edge

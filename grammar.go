@@ -20,10 +20,10 @@ import "github.com/odvcencio/gotreesitter/grammargen"
 //	pair            → IDENT ":" value
 //	value           → STRING | NUMBER | IDENT | list
 //	list            → "[" value ("," value)* "]"
-//	boundary_decl   → "boundary" boundary_kind STRING boundary_block
+//	boundary_decl   → "boundary" boundary_kind STRING metadata_block? boundary_block
 //	boundary_kind   → "trust" | "network" | "deployment" | "team"
 //	boundary_block  → "{" (element_decl | boundary_decl | edge_decl)* "}"
-//	edge_decl       → IDENT arrow IDENT (":" edge_kind STRING?)?
+//	edge_decl       → IDENT arrow IDENT (":" edge_kind STRING?)? metadata_block?
 //	arrow           → "->" | "<-" | "<->"
 //	edge_kind       → "calls" | "reads" | "writes" | "publishes"
 //	                | "subscribes" | "depends_on" | "flow"
@@ -61,11 +61,17 @@ func SirenaGrammar() *grammargen.Grammar {
 		grammargen.Str("node"),
 	))
 
-	// boundary_decl → "boundary" boundary_kind STRING boundary_block
+	// boundary_decl → "boundary" boundary_kind STRING metadata_block? boundary_block
+	//
+	// The optional metadata_block appears BEFORE the boundary_block (children).
+	// Both blocks begin with "{" but are syntactically distinguishable because
+	// metadata_block contains `pair` nodes (IDENT ":" value) while
+	// boundary_block contains nested declarations starting with kind keywords.
 	g.Define("boundary_decl", grammargen.Seq(
 		grammargen.Str("boundary"),
 		grammargen.Field("kind", grammargen.Sym("boundary_kind")),
 		grammargen.Field("name", grammargen.Sym("string")),
+		grammargen.Optional(grammargen.Field("metadata", grammargen.Sym("metadata_block"))),
 		grammargen.Field("body", grammargen.Sym("boundary_block")),
 	))
 
@@ -81,6 +87,7 @@ func SirenaGrammar() *grammargen.Grammar {
 		grammargen.Str("boundary"),
 		grammargen.Field("kind", grammargen.Sym("boundary_kind")),
 		grammargen.Field("name", grammargen.Sym("string")),
+		grammargen.Optional(grammargen.Field("metadata", grammargen.Sym("metadata_block"))),
 		grammargen.Field("body", grammargen.Sym("boundary_block")),
 	))
 
@@ -109,7 +116,10 @@ func SirenaGrammar() *grammargen.Grammar {
 		grammargen.Str("}"),
 	))
 
-	// edge_decl → IDENT arrow IDENT (":" edge_kind STRING?)?
+	// edge_decl → IDENT arrow IDENT (":" edge_kind STRING?)? metadata_block?
+	//
+	// Edge metadata is the optional trailing block; no ambiguity arises
+	// because nothing else syntactically follows an edge declaration.
 	//
 	// TODO(task-7): accept qualified_ident (IDENT.IDENT) for namespaced
 	// endpoints once the import grammar lands.
@@ -122,6 +132,7 @@ func SirenaGrammar() *grammargen.Grammar {
 			grammargen.Field("kind", grammargen.Sym("edge_kind")),
 			grammargen.Optional(grammargen.Field("label", grammargen.Sym("string"))),
 		)),
+		grammargen.Optional(grammargen.Field("metadata", grammargen.Sym("metadata_block"))),
 	))
 
 	// edge_decl_nested is a structurally identical sibling of edge_decl,
@@ -140,6 +151,7 @@ func SirenaGrammar() *grammargen.Grammar {
 			grammargen.Field("kind", grammargen.Sym("edge_kind")),
 			grammargen.Optional(grammargen.Field("label", grammargen.Sym("string"))),
 		)),
+		grammargen.Optional(grammargen.Field("metadata", grammargen.Sym("metadata_block"))),
 	))
 
 	// arrow → "->" | "<-" | "<->"

@@ -153,6 +153,10 @@ func lowerBoundary(node *gotreesitter.Node, lang *gotreesitter.Language, src []b
 		Range: Range{Start: int(node.StartByte()), End: int(node.EndByte())},
 	}
 
+	if metaNode := node.ChildByFieldName("metadata", lang); metaNode != nil {
+		b.Metadata = lowerMetadataBlock(metaNode, lang, src)
+	}
+
 	for i := 0; i < bodyNode.NamedChildCount(); i++ {
 		child := bodyNode.NamedChild(i)
 		if child == nil {
@@ -209,6 +213,9 @@ func lowerEdge(node *gotreesitter.Node, lang *gotreesitter.Language, src []byte)
 	if labelNode := node.ChildByFieldName("label", lang); labelNode != nil {
 		e.Label = decodeStringLiteral(nodeText(labelNode, src))
 	}
+	if metaNode := node.ChildByFieldName("metadata", lang); metaNode != nil {
+		e.Metadata = lowerMetadataBlock(metaNode, lang, src)
+	}
 
 	return e
 }
@@ -231,16 +238,19 @@ func lowerElement(node *gotreesitter.Node, lang *gotreesitter.Language, src []by
 	}
 
 	if body := node.ChildByFieldName("body", lang); body != nil {
-		e.Metadata = lowerBlock(body, lang, src)
+		e.Metadata = lowerMetadataBlock(body, lang, src)
 	}
 
 	return e
 }
 
-// lowerBlock walks a block CST node and returns its metadata map. Returns
-// nil when the block contains no pairs (an empty `{}` block stays nil to
-// keep the IR canonical).
-func lowerBlock(node *gotreesitter.Node, lang *gotreesitter.Language, src []byte) map[string]Value {
+// lowerMetadataBlock walks a metadata_block CST node and returns its pairs
+// as a typed map. Returns nil when the block contains no pairs (an empty
+// `{}` block stays nil to keep the IR canonical and to preserve the "no
+// metadata declared" vs "metadata declared but empty" distinction — we
+// collapse both to nil because empty maps are not semantically useful for
+// downstream consumers). Shared by lowerElement, lowerBoundary, lowerEdge.
+func lowerMetadataBlock(node *gotreesitter.Node, lang *gotreesitter.Language, src []byte) map[string]Value {
 	var out map[string]Value
 	for i := 0; i < node.NamedChildCount(); i++ {
 		child := node.NamedChild(i)
