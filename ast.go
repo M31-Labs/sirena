@@ -16,8 +16,17 @@ type Document struct {
 // SystemDecl groups every top-level system-file declaration parsed from
 // one source. View declarations are added in Task 8.
 type SystemDecl struct {
-	Elements []*Element
-	Range    Range
+	Elements   []*Element
+	Boundaries []*Boundary
+	Range      Range
+}
+
+// Node is the closed sum type for things that can appear as children
+// of a boundary or at top level: *Element and *Boundary today; future
+// tasks add *Edge to this list. The unexported sentinel keeps the
+// surface closed — external packages cannot add new Node variants.
+type Node interface {
+	isSirenaNode()
 }
 
 // Element is a typed system component declaration.
@@ -26,6 +35,70 @@ type Element struct {
 	Name     string
 	Metadata map[string]Value
 	Range    Range
+}
+
+func (*Element) isSirenaNode() {}
+
+// Boundary is a typed container that groups elements and nested boundaries.
+// The Kind determines default rendering treatment (dashed for trust, solid
+// for network, etc.) and is the primary structural axis used by layout.
+// Boundaries are declared with a string-literal Name so authors can use
+// arbitrary domain language (e.g. "pci", "us-east-1") without colliding
+// with the identifier grammar used by elements.
+type Boundary struct {
+	Kind     BoundaryKind
+	Name     string           // declared as a STRING literal, e.g. "pci"
+	Children []Node           // *Element and *Boundary; future: *Edge
+	Metadata map[string]Value // empty for v0.1; later tasks allow metadata blocks on boundaries
+	Range    Range
+}
+
+func (*Boundary) isSirenaNode() {}
+
+// BoundaryKind enumerates the typed boundary nouns. The zero value is
+// reserved as BoundaryKindUnknown so misuse surfaces obviously.
+type BoundaryKind int
+
+const (
+	// BoundaryKindUnknown is the zero value; not a valid boundary kind.
+	BoundaryKindUnknown BoundaryKind = iota
+	BoundaryKindTrust
+	BoundaryKindNetwork
+	BoundaryKindDeployment
+	BoundaryKindTeam
+)
+
+// String returns the source keyword for this kind, e.g. "trust".
+func (k BoundaryKind) String() string {
+	switch k {
+	case BoundaryKindTrust:
+		return "trust"
+	case BoundaryKindNetwork:
+		return "network"
+	case BoundaryKindDeployment:
+		return "deployment"
+	case BoundaryKindTeam:
+		return "team"
+	default:
+		return "unknown"
+	}
+}
+
+// boundaryKindForKeyword maps a source keyword to its BoundaryKind.
+// Returns BoundaryKindUnknown if the keyword is not a recognized kind.
+func boundaryKindForKeyword(kw string) BoundaryKind {
+	switch kw {
+	case "trust":
+		return BoundaryKindTrust
+	case "network":
+		return BoundaryKindNetwork
+	case "deployment":
+		return BoundaryKindDeployment
+	case "team":
+		return BoundaryKindTeam
+	default:
+		return BoundaryKindUnknown
+	}
 }
 
 // ElementKind enumerates the typed element nouns. The zero value is

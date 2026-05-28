@@ -113,11 +113,15 @@ func lowerDocument(root *gotreesitter.Node, lang *gotreesitter.Language, src []b
 		if child == nil {
 			continue
 		}
-		if child.Type(lang) != "element_decl" {
-			continue
-		}
-		if e := lowerElement(child, lang, src); e != nil {
-			sys.Elements = append(sys.Elements, e)
+		switch child.Type(lang) {
+		case "element_decl":
+			if e := lowerElement(child, lang, src); e != nil {
+				sys.Elements = append(sys.Elements, e)
+			}
+		case "boundary_decl":
+			if b := lowerBoundary(child, lang, src); b != nil {
+				sys.Boundaries = append(sys.Boundaries, b)
+			}
 		}
 	}
 
@@ -125,6 +129,44 @@ func lowerDocument(root *gotreesitter.Node, lang *gotreesitter.Language, src []b
 		Systems: []*SystemDecl{sys},
 		Range:   docRange,
 	}
+}
+
+// lowerBoundary converts a single boundary_decl CST node into a *Boundary.
+// The CST exposes three named fields: "kind" (the keyword), "name" (the
+// STRING literal — its quotes are stripped here), and "body" (the
+// boundary_block whose children become Node entries).
+func lowerBoundary(node *gotreesitter.Node, lang *gotreesitter.Language, src []byte) *Boundary {
+	kindNode := node.ChildByFieldName("kind", lang)
+	nameNode := node.ChildByFieldName("name", lang)
+	bodyNode := node.ChildByFieldName("body", lang)
+	if kindNode == nil || nameNode == nil || bodyNode == nil {
+		return nil
+	}
+
+	b := &Boundary{
+		Kind:  boundaryKindForKeyword(nodeText(kindNode, src)),
+		Name:  decodeStringLiteral(nodeText(nameNode, src)),
+		Range: Range{Start: int(node.StartByte()), End: int(node.EndByte())},
+	}
+
+	for i := 0; i < bodyNode.NamedChildCount(); i++ {
+		child := bodyNode.NamedChild(i)
+		if child == nil {
+			continue
+		}
+		switch child.Type(lang) {
+		case "element_decl":
+			if e := lowerElement(child, lang, src); e != nil {
+				b.Children = append(b.Children, e)
+			}
+		case "boundary_decl":
+			if nested := lowerBoundary(child, lang, src); nested != nil {
+				b.Children = append(b.Children, nested)
+			}
+		}
+	}
+
+	return b
 }
 
 // lowerElement converts a single element_decl CST node into an *Element.
