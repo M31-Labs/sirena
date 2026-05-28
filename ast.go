@@ -59,6 +59,10 @@ type Element struct {
 	Kind     ElementKind
 	Name     string
 	Metadata map[string]Value
+	// Override marks the element as a hand-authored override of a generated
+	// `.gen.sir` declaration with the same name. Nil when no `@override`
+	// annotation was written. See Override for the field-scoped semantics.
+	Override *Override
 	Range    Range
 }
 
@@ -75,6 +79,10 @@ type Boundary struct {
 	Name     string           // declared as a STRING literal, e.g. "pci"
 	Children []Node           // *Element, *Boundary, and *Edge
 	Metadata map[string]Value // empty for v0.1; later tasks allow metadata blocks on boundaries
+	// Override marks the boundary as a hand-authored override of a generated
+	// `.gen.sir` declaration with the same name. Nil when no `@override`
+	// annotation was written. See Override for the field-scoped semantics.
+	Override *Override
 	Range    Range
 }
 
@@ -146,7 +154,14 @@ type Edge struct {
 	Direction Direction
 	Label     string           // optional; empty when no label string follows
 	Metadata  map[string]Value // empty for v0.1; later tasks add metadata blocks on edges
-	Range     Range
+	// Override marks the edge as a hand-authored override of a generated
+	// `.gen.sir` declaration with the same endpoints/kind. Nil when no
+	// `@override` annotation was written. The plan describes overrides on
+	// element / boundary declarations explicitly; edges carry the same
+	// field so a code-emitting agent that generates edges can mark them
+	// curated by the same mechanism. See Override.
+	Override *Override
+	Range    Range
 }
 
 func (*Edge) isSirenaNode() {}
@@ -449,6 +464,50 @@ type LayoutHints struct {
 	Pin       map[string]string // name → side
 	Metadata  map[string]Value  // unrecognized keys
 	Range     Range
+}
+
+// Override marks an element, boundary, or edge as a hand-authored override
+// of a generated `.gen.sir` declaration with the same name. Field-scoped
+// overrides let humans curate specific fields while the generator continues
+// to own the rest. The workspace resolver (Phase 5) merges generated and
+// hand-authored declarations using this annotation.
+type Override struct {
+	Mode   OverrideMode
+	Fields []string // names of overridden fields; semantics depend on Mode
+	Range  Range
+}
+
+// OverrideMode discriminates how Override.Fields is interpreted.
+type OverrideMode int
+
+const (
+	// OverrideUnknown is the zero value; not a valid override mode.
+	OverrideUnknown OverrideMode = iota
+	// OverrideAll corresponds to a bare `@override` — the hand declaration
+	// wins wholesale and Fields is empty.
+	OverrideAll
+	// OverrideFields corresponds to `@override(label, tags)` — only the
+	// listed fields win; unlisted fields stay owned by the generator.
+	OverrideFields
+	// OverrideExcept corresponds to `@override(except: source_ref)` —
+	// every field EXCEPT those listed is overridden; the listed fields
+	// stay owned by the generator.
+	OverrideExcept
+)
+
+// String returns a stable short label for the mode, used for diagnostics
+// and the Phase 5 resolver's merge log.
+func (m OverrideMode) String() string {
+	switch m {
+	case OverrideAll:
+		return "all"
+	case OverrideFields:
+		return "fields"
+	case OverrideExcept:
+		return "except"
+	default:
+		return "unknown"
+	}
 }
 
 // Budget caps view complexity. The view evaluator enforces these caps in

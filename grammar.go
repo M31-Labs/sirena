@@ -15,19 +15,22 @@ import "github.com/odvcencio/gotreesitter/grammargen"
 //
 //	source_file       → (import_decl | element_decl | boundary_decl | edge_decl | view_decl)*
 //	import_decl       → "import" STRING
-//	element_decl      → kind_keyword IDENT metadata_block?
+//	element_decl      → kind_keyword IDENT override_annotation? metadata_block?
 //	kind_keyword      → "service" | "database" | "queue" | "cache" | "job"
 //	                  | "external" | "client" | "gateway" | "node"
 //	metadata_block    → "{" pair* "}"
 //	pair              → IDENT ":" value
 //	value             → STRING | NUMBER | IDENT | list
 //	list              → "[" value ("," value)* "]"
-//	boundary_decl     → "boundary" boundary_kind STRING metadata_block? boundary_block
+//	boundary_decl     → "boundary" boundary_kind STRING override_annotation?
+//	                    metadata_block? boundary_block
 //	boundary_kind     → "trust" | "network" | "deployment" | "team"
 //	boundary_block    → "{" (element_decl | boundary_decl | edge_decl)* "}"
 //	edge_decl         → (IDENT | qualified_ident) arrow (IDENT | qualified_ident)
-//	                    (":" edge_kind STRING?)? metadata_block?
+//	                    override_annotation? (":" edge_kind STRING?)? metadata_block?
 //	qualified_ident   → IDENT "." IDENT
+//	override_annotation → "@override" override_args?
+//	override_args     → "(" ("except" ":")? (IDENT ("," IDENT)*)? ")"
 //	arrow             → "->" | "<-" | "<->"
 //	edge_kind         → "calls" | "reads" | "writes" | "publishes"
 //	                  | "subscribes" | "depends_on" | "flow"
@@ -80,10 +83,17 @@ func SirenaGrammar() *grammargen.Grammar {
 		grammargen.Field("path", grammargen.Sym("string")),
 	))
 
-	// element_decl → kind_keyword IDENT metadata_block?
+	// element_decl → kind_keyword IDENT override_annotation? metadata_block?
+	//
+	// The override_annotation slots between the name and the optional metadata
+	// block so authors write `service api @override { ... }` reading
+	// left-to-right. The annotation itself is unambiguous — it begins with
+	// `@`, which appears nowhere else in the grammar — so LR(1) picks it up
+	// with no lookahead games.
 	g.Define("element_decl", grammargen.Seq(
 		grammargen.Field("kind", grammargen.Sym("kind_keyword")),
 		grammargen.Field("name", grammargen.Sym("identifier")),
+		grammargen.Optional(grammargen.Field("override", grammargen.Sym("override_annotation"))),
 		grammargen.Optional(grammargen.Field("body", grammargen.Sym("metadata_block"))),
 	))
 
@@ -100,16 +110,20 @@ func SirenaGrammar() *grammargen.Grammar {
 		grammargen.Str("node"),
 	))
 
-	// boundary_decl → "boundary" boundary_kind STRING metadata_block? boundary_block
+	// boundary_decl → "boundary" boundary_kind STRING override_annotation?
+	//                 metadata_block? boundary_block
 	//
 	// The optional metadata_block appears BEFORE the boundary_block (children).
 	// Both blocks begin with "{" but are syntactically distinguishable because
 	// metadata_block contains `pair` nodes (IDENT ":" value) while
 	// boundary_block contains nested declarations starting with kind keywords.
+	// override_annotation slots between the boundary name and the optional
+	// metadata block; its leading `@` token is unambiguous.
 	g.Define("boundary_decl", grammargen.Seq(
 		grammargen.Str("boundary"),
 		grammargen.Field("kind", grammargen.Sym("boundary_kind")),
 		grammargen.Field("name", grammargen.Sym("string")),
+		grammargen.Optional(grammargen.Field("override", grammargen.Sym("override_annotation"))),
 		grammargen.Optional(grammargen.Field("metadata", grammargen.Sym("metadata_block"))),
 		grammargen.Field("body", grammargen.Sym("boundary_block")),
 	))
@@ -126,6 +140,7 @@ func SirenaGrammar() *grammargen.Grammar {
 		grammargen.Str("boundary"),
 		grammargen.Field("kind", grammargen.Sym("boundary_kind")),
 		grammargen.Field("name", grammargen.Sym("string")),
+		grammargen.Optional(grammargen.Field("override", grammargen.Sym("override_annotation"))),
 		grammargen.Optional(grammargen.Field("metadata", grammargen.Sym("metadata_block"))),
 		grammargen.Field("body", grammargen.Sym("boundary_block")),
 	))
@@ -170,6 +185,7 @@ func SirenaGrammar() *grammargen.Grammar {
 		grammargen.Field("from", grammargen.Sym("_ident_or_qualified")),
 		grammargen.Field("arrow", grammargen.Sym("arrow")),
 		grammargen.Field("to", grammargen.Sym("_ident_or_qualified")),
+		grammargen.Optional(grammargen.Field("override", grammargen.Sym("override_annotation"))),
 		grammargen.Optional(grammargen.Seq(
 			grammargen.Str(":"),
 			grammargen.Field("kind", grammargen.Sym("edge_kind")),
@@ -189,6 +205,7 @@ func SirenaGrammar() *grammargen.Grammar {
 		grammargen.Field("from", grammargen.Sym("_ident_or_qualified")),
 		grammargen.Field("arrow", grammargen.Sym("arrow")),
 		grammargen.Field("to", grammargen.Sym("_ident_or_qualified")),
+		grammargen.Optional(grammargen.Field("override", grammargen.Sym("override_annotation"))),
 		grammargen.Optional(grammargen.Seq(
 			grammargen.Str(":"),
 			grammargen.Field("kind", grammargen.Sym("edge_kind")),
@@ -235,6 +252,59 @@ func SirenaGrammar() *grammargen.Grammar {
 		grammargen.Str("depends_on"),
 		grammargen.Str("flow"),
 	))
+
+	// override_annotation → "@override" override_args?
+	//
+	// `@override` is a single anonymous string token rather than two tokens
+	// (`@` + the `override` keyword). The leading `@` appears nowhere else
+	// in the grammar, so the lexer routes it unambiguously and the parser
+	// does not need precedence hints to tell it apart from a normal
+	// identifier or metadata key. The optional args parenthesized group is
+	// hoisted into its own rule (`override_args`) so the CST exposes a
+	// stable `args` field for the lowering function to consult.
+	g.Define("override_annotation", grammargen.Seq(
+		grammargen.Str("@override"),
+		grammargen.Optional(grammargen.Field("args", grammargen.Sym("override_args"))),
+	))
+
+	// override_args → "(" ("except" ":")? (IDENT ("," IDENT)*)? ")"
+	//
+	// Two shapes are accepted inside the parens:
+	//   1. `(field1, field2)`         — OverrideFields mode.
+	//   2. `(except: field1, field2)` — OverrideExcept mode.
+	// The leading `except` keyword followed by `:` is the discriminator;
+	// LR(1) picks one branch by looking at the first two tokens after `(`.
+	// The empty-args shape `()` is permitted by the grammar (the field
+	// list is Optional) — Phase 10 will lint it as a likely author error
+	// because the IR cannot distinguish empty args from OverrideAll.
+	//
+	// Field names on this rule: `except` (a sentinel node — its presence
+	// flips the lowering to OverrideExcept mode), and `fields` (the IDENT
+	// list, lowered into Override.Fields).
+	g.Define("override_args", grammargen.Seq(
+		grammargen.Str("("),
+		grammargen.Optional(grammargen.Field("except", grammargen.Sym("override_except"))),
+		grammargen.Optional(grammargen.Field("fields", grammargen.Sym("override_field_list"))),
+		grammargen.Str(")"),
+	))
+
+	// override_except → "except" ":"
+	//
+	// Hoisting the `except :` pair into its own rule lets `override_args`
+	// reference it as a single field-named child. Without this hoist the
+	// `except` field would point at just the keyword and the `:` would
+	// dangle as an anonymous token, making the CST harder to walk.
+	g.Define("override_except", grammargen.Seq(
+		grammargen.Str("except"),
+		grammargen.Str(":"),
+	))
+
+	// override_field_list → IDENT ("," IDENT)*
+	//
+	// The list is non-empty by construction (CommaSep1). The Optional()
+	// wrapper around the `fields` field on override_args is what makes the
+	// entire list optional inside the parens.
+	g.Define("override_field_list", grammargen.CommaSep1(grammargen.Sym("identifier")))
 
 	// metadata_block → "{" pair* "}"
 	g.Define("metadata_block", grammargen.Seq(

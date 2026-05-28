@@ -205,6 +205,10 @@ func lowerBoundary(node *gotreesitter.Node, lang *gotreesitter.Language, src []b
 		Range: Range{Start: int(node.StartByte()), End: int(node.EndByte())},
 	}
 
+	if ovr := node.ChildByFieldName("override", lang); ovr != nil {
+		b.Override = lowerOverride(ovr, lang, src)
+	}
+
 	if metaNode := node.ChildByFieldName("metadata", lang); metaNode != nil {
 		b.Metadata = lowerMetadataBlock(metaNode, lang, src)
 	}
@@ -270,6 +274,9 @@ func lowerEdge(node *gotreesitter.Node, lang *gotreesitter.Language, src []byte)
 	}
 	if labelNode := node.ChildByFieldName("label", lang); labelNode != nil {
 		e.Label = decodeStringLiteral(nodeText(labelNode, src))
+	}
+	if ovr := node.ChildByFieldName("override", lang); ovr != nil {
+		e.Override = lowerOverride(ovr, lang, src)
 	}
 	if metaNode := node.ChildByFieldName("metadata", lang); metaNode != nil {
 		e.Metadata = lowerMetadataBlock(metaNode, lang, src)
@@ -644,11 +651,62 @@ func lowerElement(node *gotreesitter.Node, lang *gotreesitter.Language, src []by
 		Range: Range{Start: int(node.StartByte()), End: int(node.EndByte())},
 	}
 
+	if ovr := node.ChildByFieldName("override", lang); ovr != nil {
+		e.Override = lowerOverride(ovr, lang, src)
+	}
+
 	if body := node.ChildByFieldName("body", lang); body != nil {
 		e.Metadata = lowerMetadataBlock(body, lang, src)
 	}
 
 	return e
+}
+
+// lowerOverride converts an override_annotation CST node into an *Override.
+// Three CST shapes map to three distinct modes:
+//
+//   - bare `@override`             → OverrideAll,    Fields empty
+//   - `@override(label, tags)`     → OverrideFields, Fields = ["label","tags"]
+//   - `@override(except: src_ref)` → OverrideExcept, Fields = ["src_ref"]
+//
+// The discriminator is the presence of the `except` keyword in the args.
+// An args group with no `except` (and a possibly empty field list) is
+// treated as OverrideFields; the Phase 10 lint will flag literally-empty
+// `@override()` because it is indistinguishable from OverrideAll in the IR.
+func lowerOverride(node *gotreesitter.Node, lang *gotreesitter.Language, src []byte) *Override {
+	o := &Override{
+		Range: Range{Start: int(node.StartByte()), End: int(node.EndByte())},
+	}
+
+	args := node.ChildByFieldName("args", lang)
+	if args == nil {
+		o.Mode = OverrideAll
+		return o
+	}
+
+	if args.ChildByFieldName("except", lang) != nil {
+		o.Mode = OverrideExcept
+	} else {
+		o.Mode = OverrideFields
+	}
+
+	if fields := args.ChildByFieldName("fields", lang); fields != nil {
+		for i := 0; i < fields.NamedChildCount(); i++ {
+			ident := fields.NamedChild(i)
+			if ident == nil {
+				continue
+			}
+			// The override_field_list rule contains only identifier nodes
+			// (CommaSep1 of `identifier`). Anything else is a CST shape we
+			// did not generate — skip to stay forward-compatible.
+			if ident.Type(lang) != "identifier" {
+				continue
+			}
+			o.Fields = append(o.Fields, nodeText(ident, src))
+		}
+	}
+
+	return o
 }
 
 // lowerMetadataBlock walks a metadata_block CST node and returns its pairs

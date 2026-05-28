@@ -555,6 +555,121 @@ func TestParse_View_Minimal(t *testing.T) {
 	}
 }
 
+func TestParse_Override_All(t *testing.T) {
+	src := []byte(`service api @override`)
+	doc, err := sirena.Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(doc.Systems) != 1 || len(doc.Systems[0].Elements) != 1 {
+		t.Fatalf("expected 1 element, doc=%+v", doc)
+	}
+	e := doc.Systems[0].Elements[0]
+	if e.Override == nil {
+		t.Fatal("Override nil")
+	}
+	if e.Override.Mode != sirena.OverrideAll {
+		t.Errorf("Mode: %v (want OverrideAll)", e.Override.Mode)
+	}
+	if len(e.Override.Fields) != 0 {
+		t.Errorf("Fields should be empty: %v", e.Override.Fields)
+	}
+}
+
+func TestParse_Override_Fields(t *testing.T) {
+	src := []byte(`service api @override(label, tags) {
+  label: "API Service"
+  tags: [stateless]
+}`)
+	doc, err := sirena.Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	e := doc.Systems[0].Elements[0]
+	if e.Override == nil {
+		t.Fatal("Override nil")
+	}
+	if e.Override.Mode != sirena.OverrideFields {
+		t.Errorf("Mode: %v (want OverrideFields)", e.Override.Mode)
+	}
+	if !reflect.DeepEqual(e.Override.Fields, []string{"label", "tags"}) {
+		t.Errorf("Fields: %v", e.Override.Fields)
+	}
+	if e.Metadata == nil {
+		t.Errorf("Metadata nil")
+	}
+}
+
+func TestParse_Override_Except(t *testing.T) {
+	src := []byte(`service api @override(except: source_ref)`)
+	doc, err := sirena.Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	e := doc.Systems[0].Elements[0]
+	if e.Override == nil {
+		t.Fatal("Override nil")
+	}
+	if e.Override.Mode != sirena.OverrideExcept {
+		t.Errorf("Mode: %v (want OverrideExcept)", e.Override.Mode)
+	}
+	if !reflect.DeepEqual(e.Override.Fields, []string{"source_ref"}) {
+		t.Errorf("Fields: %v", e.Override.Fields)
+	}
+}
+
+func TestParse_Override_OnBoundary(t *testing.T) {
+	src := []byte(`boundary trust "pci" @override(label) {
+  service api
+}`)
+	doc, err := sirena.Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	b := doc.Systems[0].Boundaries[0]
+	if b.Override == nil {
+		t.Fatal("Boundary.Override nil")
+	}
+	if b.Override.Mode != sirena.OverrideFields {
+		t.Errorf("Mode: %v", b.Override.Mode)
+	}
+	if !reflect.DeepEqual(b.Override.Fields, []string{"label"}) {
+		t.Errorf("Fields: %v", b.Override.Fields)
+	}
+	if len(b.Children) != 1 {
+		t.Errorf("Children: %d (override should not eat boundary_block)", len(b.Children))
+	}
+}
+
+func TestParse_SidAndPriorSourceRef_AreOrdinaryMetadata(t *testing.T) {
+	// Per the plan: `sid:` and `prior_source_ref:` parse as ordinary
+	// metadata pairs, NOT as special grammar. The Phase 3+ semantic
+	// resolver gives them meaning. This test pins the contract so a future
+	// task does not accidentally promote them to typed fields.
+	src := []byte(`service api {
+  sid: "01H8XGABCDEF"
+  prior_source_ref: "code://go/old/pkg#OldName"
+  source_ref: "code://go/new/pkg#NewName"
+}`)
+	doc, err := sirena.Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	md := doc.Systems[0].Elements[0].Metadata
+	if md == nil {
+		t.Fatal("Metadata nil")
+	}
+	if s, ok := md["sid"].(sirena.String); !ok || s.Value != "01H8XGABCDEF" {
+		t.Errorf("sid: %#v", md["sid"])
+	}
+	if s, ok := md["prior_source_ref"].(sirena.String); !ok || s.Value != "code://go/old/pkg#OldName" {
+		t.Errorf("prior_source_ref: %#v", md["prior_source_ref"])
+	}
+	if s, ok := md["source_ref"].(sirena.String); !ok || s.Value != "code://go/new/pkg#NewName" {
+		t.Errorf("source_ref: %#v", md["source_ref"])
+	}
+}
+
 func TestParse_QualifiedEdgeTarget(t *testing.T) {
 	src := []byte(`import "../shared/platform.sir"
 service api
