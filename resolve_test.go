@@ -2,6 +2,7 @@ package sirena_test
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"m31labs.dev/sirena"
@@ -183,5 +184,176 @@ func TestResolve_TouchSkipsUnchanged(t *testing.T) {
 	}
 	if doc1 != doc2 {
 		t.Errorf("Touch should be a no-op for unchanged file")
+	}
+}
+
+// TestResolveWorkspace_BindsEdgeRefs drives Task 18: after
+// ws.ResolveWorkspace(), every Edge.FromRef.Definition and
+// Edge.ToRef.Definition is populated for resolvable targets.
+func TestResolveWorkspace_BindsEdgeRefs(t *testing.T) {
+	root := fixtureWorkspace(t, map[string]string{
+		"main.sir": `service api
+database db
+api -> db: writes`,
+	})
+	ws, _ := sirena.OpenWorkspace(root)
+	diags := ws.ResolveWorkspace()
+	if len(diags) != 0 {
+		t.Errorf("expected 0 diagnostics, got %+v", diags)
+	}
+
+	// Locate the doc to inspect the edge's bound Definition.
+	var f *sirena.WorkspaceFile
+	for _, wf := range ws.Files {
+		if wf.RelPath == "main.sir" {
+			f = wf
+		}
+	}
+	doc, _ := ws.LoadDocument(f)
+	if len(doc.Systems[0].Edges) != 1 {
+		t.Fatalf("Edges: %d", len(doc.Systems[0].Edges))
+	}
+	e := doc.Systems[0].Edges[0]
+
+	if e.FromRef == nil || e.FromRef.Definition == nil {
+		t.Errorf("From not bound: %+v", e.FromRef)
+	}
+	if e.ToRef == nil || e.ToRef.Definition == nil {
+		t.Errorf("To not bound: %+v", e.ToRef)
+	}
+
+	fromEl, ok := e.FromRef.Definition.(*sirena.Element)
+	if !ok || fromEl.Name != "api" {
+		t.Errorf("FromRef.Definition: %#v", e.FromRef.Definition)
+	}
+	toEl, ok := e.ToRef.Definition.(*sirena.Element)
+	if !ok || toEl.Name != "db" {
+		t.Errorf("ToRef.Definition: %#v", e.ToRef.Definition)
+	}
+}
+
+// TestResolveWorkspace_UnresolvedTargetSurfacesDiagnostic asserts that a
+// missing target produces a SIR-REF-UNRESOLVED diagnostic anchored at the
+// edge's Range.
+func TestResolveWorkspace_UnresolvedTargetSurfacesDiagnostic(t *testing.T) {
+	root := fixtureWorkspace(t, map[string]string{
+		"main.sir": `service api
+api -> ghost: calls`,
+	})
+	ws, _ := sirena.OpenWorkspace(root)
+	diags := ws.ResolveWorkspace()
+	var found bool
+	for _, d := range diags {
+		if d.Code == "SIR-REF-UNRESOLVED" && strings.Contains(d.Message, "ghost") {
+			found = true
+			if d.Severity != sirena.SeverityError {
+				t.Errorf("Severity: %v", d.Severity)
+			}
+		}
+	}
+	if !found {
+		t.Errorf("expected SIR-REF-UNRESOLVED for ghost; got %+v", diags)
+	}
+}
+
+// TestResolveWorkspace_CrossFileEdge asserts an edge whose source lives in
+// one file and target in another binds both refs cleanly.
+func TestResolveWorkspace_CrossFileEdge(t *testing.T) {
+	root := fixtureWorkspace(t, map[string]string{
+		"a.sir": `service api`,
+		"b.sir": `database db
+api -> db: writes`,
+	})
+	ws, _ := sirena.OpenWorkspace(root)
+	diags := ws.ResolveWorkspace()
+	if len(diags) != 0 {
+		t.Errorf("expected 0 diags, got %+v", diags)
+	}
+
+	var f *sirena.WorkspaceFile
+	for _, wf := range ws.Files {
+		if wf.RelPath == "b.sir" {
+			f = wf
+		}
+	}
+	doc, _ := ws.LoadDocument(f)
+	e := doc.Systems[0].Edges[0]
+	if e.FromRef.Definition == nil {
+		t.Error("cross-file From not bound")
+	}
+}
+
+// TestResolveWorkspace_NestedBoundaryEdge asserts that an edge declared
+// inside a boundary still gets its refs bound (the walker must descend
+// into Boundary.Children).
+func TestResolveWorkspace_NestedBoundaryEdge(t *testing.T) {
+	root := fixtureWorkspace(t, map[string]string{
+		"main.sir": `boundary trust "pci" {
+  service api
+  database db
+  api -> db: writes
+}`,
+	})
+	ws, _ := sirena.OpenWorkspace(root)
+	diags := ws.ResolveWorkspace()
+	if len(diags) != 0 {
+		t.Errorf("expected 0 diags, got %+v", diags)
+	}
+
+	var f *sirena.WorkspaceFile
+	for _, wf := range ws.Files {
+		if wf.RelPath == "main.sir" {
+			f = wf
+		}
+	}
+	doc, _ := ws.LoadDocument(f)
+	b := doc.Systems[0].Boundaries[0]
+	// The edge is one of the boundary's Children.
+	var nestedEdge *sirena.Edge
+	for _, c := range b.Children {
+		if e, ok := c.(*sirena.Edge); ok {
+			nestedEdge = e
+		}
+	}
+	if nestedEdge == nil {
+		t.Fatal("nested edge missing")
+	}
+	if nestedEdge.FromRef == nil || nestedEdge.FromRef.Definition == nil {
+		t.Error("nested edge From not bound")
+	}
+	if nestedEdge.ToRef == nil || nestedEdge.ToRef.Definition == nil {
+		t.Error("nested edge To not bound")
+	}
+}
+
+// TestResolveWorkspace_NamespacedEdge asserts that a `ns.name` target on
+// an edge binds through the importing file's namespace map.
+func TestResolveWorkspace_NamespacedEdge(t *testing.T) {
+	root := fixtureWorkspace(t, map[string]string{
+		"shared/platform.sir": `service kafka`,
+		"main.sir": `import "shared/platform.sir"
+service api
+api -> platform.kafka: publishes`,
+	})
+	ws, _ := sirena.OpenWorkspace(root)
+	diags := ws.ResolveWorkspace()
+	if len(diags) != 0 {
+		t.Errorf("expected 0 diags, got %+v", diags)
+	}
+
+	var f *sirena.WorkspaceFile
+	for _, wf := range ws.Files {
+		if wf.RelPath == "main.sir" {
+			f = wf
+		}
+	}
+	doc, _ := ws.LoadDocument(f)
+	e := doc.Systems[0].Edges[0]
+	if e.ToRef.Definition == nil {
+		t.Error("platform.kafka not bound")
+	}
+	el, ok := e.ToRef.Definition.(*sirena.Element)
+	if !ok || el.Name != "kafka" {
+		t.Errorf("ToRef.Definition: %#v", e.ToRef.Definition)
 	}
 }

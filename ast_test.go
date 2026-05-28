@@ -43,6 +43,9 @@ func TestIR_ZeroValue(t *testing.T) {
 	if ref.Range != (Range{}) {
 		t.Error("Ref.Range zero not Range{}")
 	}
+	if ref.Definition != nil {
+		t.Error("Ref.Definition zero not nil")
+	}
 
 	var sys SystemDecl
 	if sys.Elements != nil {

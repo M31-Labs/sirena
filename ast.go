@@ -33,13 +33,17 @@ type Import struct {
 // Ref is a resolved identifier reference. At parse time, Name is the
 // identifier as written and Namespace is the optional prefix from a
 // qualified_ident (e.g. "platform" in "platform.kafka"). Definition is
-// populated by the workspace resolver in Phase 5; the placeholder comment
-// below is intentional so future readers know the field is coming.
+// populated by the workspace resolver in Phase 5.
 type Ref struct {
 	Namespace string // optional; empty for bare IDENT
 	Name      string // the identifier as written
 	Range     Range
-	// Definition Node // populated by the resolver (Phase 5).
+	// Definition is the resolved declaration this ref points at. Nil before
+	// workspace resolution runs; populated by ws.ResolveWorkspace (Phase 5)
+	// when the workspace contains a matching symbol. May remain nil for
+	// refs that couldn't be resolved — those produce SIR-REF-UNRESOLVED
+	// diagnostics.
+	Definition Node
 }
 
 // SystemDecl groups every top-level system-file declaration parsed from

@@ -158,6 +158,107 @@ func (ws *Workspace) ResolveDiagnostics() []Diagnostic {
 	return out
 }
 
+// ResolveWorkspace performs full workspace-wide resolution:
+//   - Ensures every file is loaded and indexed (calls ensureIndexed).
+//   - Walks every edge in every file and binds Edge.FromRef.Definition
+//     and Edge.ToRef.Definition to the Symbol.Node they point at.
+//   - Emits SIR-REF-UNRESOLVED diagnostics for any From/To that can't
+//     be resolved, anchored at the edge's Range.
+//
+// Returns the cumulative diagnostics (import-resolution diagnostics from
+// the index build, plus the SIR-REF-UNRESOLVED entries gathered here).
+// Calling ResolveWorkspace again re-resolves edges using the current
+// index (useful after Touch).
+func (ws *Workspace) ResolveWorkspace() []Diagnostic {
+	ws.ensureIndexed()
+
+	// Copy the index-build diagnostics so callers see the full picture in
+	// one slice, then layer the per-edge resolution diagnostics on top.
+	out := make([]Diagnostic, len(ws.symbols.diagnostics))
+	copy(out, ws.symbols.diagnostics)
+
+	for _, f := range ws.Files {
+		if f.Kind == FileKindView {
+			continue
+		}
+		doc, err := ws.LoadDocument(f)
+		if err != nil || doc == nil {
+			// Per-file load failures surface through f.LoadErr; don't
+			// double-report them here.
+			continue
+		}
+		for _, e := range allEdges(doc) {
+			if e == nil {
+				continue
+			}
+			if e.FromRef != nil {
+				if sym := ws.Resolve(e.From); sym != nil {
+					e.FromRef.Definition = sym.Node
+				} else {
+					out = append(out, Diagnostic{
+						Code:     "SIR-REF-UNRESOLVED",
+						Severity: SeverityError,
+						Message:  fmt.Sprintf("unresolved edge source: %q", e.From),
+						Range:    e.Range,
+					})
+				}
+			}
+			if e.ToRef != nil {
+				if sym := ws.Resolve(e.To); sym != nil {
+					e.ToRef.Definition = sym.Node
+				} else {
+					out = append(out, Diagnostic{
+						Code:     "SIR-REF-UNRESOLVED",
+						Severity: SeverityError,
+						Message:  fmt.Sprintf("unresolved edge target: %q", e.To),
+						Range:    e.Range,
+					})
+				}
+			}
+		}
+	}
+	return out
+}
+
+// allEdges returns every edge in a document, including those nested inside
+// boundaries. Reused by Phase 6 view evaluation.
+func allEdges(doc *Document) []*Edge {
+	var out []*Edge
+	if doc == nil {
+		return out
+	}
+	for _, sys := range doc.Systems {
+		if sys == nil {
+			continue
+		}
+		out = append(out, sys.Edges...)
+		for _, b := range sys.Boundaries {
+			out = append(out, collectBoundaryEdges(b)...)
+		}
+	}
+	return out
+}
+
+// collectBoundaryEdges recurses into a boundary's children and returns
+// every edge declared inside (at any depth). Mirrors the boundary walk
+// shape used by collectBoundaryChildren so future passes share one mental
+// model.
+func collectBoundaryEdges(b *Boundary) []*Edge {
+	var out []*Edge
+	if b == nil {
+		return out
+	}
+	for _, c := range b.Children {
+		switch n := c.(type) {
+		case *Edge:
+			out = append(out, n)
+		case *Boundary:
+			out = append(out, collectBoundaryEdges(n)...)
+		}
+	}
+	return out
+}
+
 // Touch invalidates the symbol-table entries derived from f's previous
 // state and reindexes f if the on-disk content has changed. Other files'
 // symbol entries are preserved. If the content fingerprint is unchanged
