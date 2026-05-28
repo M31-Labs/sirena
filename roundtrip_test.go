@@ -104,8 +104,13 @@ gateway gw @override(except: source_ref) {
 }
 
 // structurallyEqual returns "" when a and b are equal ignoring all Range
-// fields (which legitimately shift across a reprint). Otherwise it returns
-// a human-readable diff produced by go-cmp.
+// fields (which legitimately shift across a reprint) and any unexported
+// fields on Document (parseDiagnostics, which the parser owns and which
+// callers cannot construct). Otherwise it returns a human-readable diff
+// produced by go-cmp.
 func structurallyEqual(a, b *sirena.Document) string {
-	return cmp.Diff(a, b, cmpopts.IgnoreTypes(sirena.Range{}))
+	return cmp.Diff(a, b,
+		cmpopts.IgnoreTypes(sirena.Range{}),
+		cmpopts.IgnoreUnexported(sirena.Document{}),
+	)
 }

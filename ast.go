@@ -17,7 +17,39 @@ type Document struct {
 	// workspace operation that loaded a manifest; Parse, which only
 	// sees a single .sir file body, never populates it.
 	Manifest *Manifest
-	Range    Range
+	// parseDiagnostics carries any diagnostic surfaced by Parse itself —
+	// today, just the SIR-PARSE-RECOVERABLE entry written when the
+	// panic-recovery path triggers. Document.Diagnostics aggregates this
+	// with the structural Validate findings so callers see a single
+	// unified slice. The field is unexported because the parser owns its
+	// emission shape; external code that wants to attach findings to a
+	// document should produce its own slice rather than mutating ours.
+	parseDiagnostics []Diagnostic
+	Range            Range
+}
+
+// Diagnostics returns the union of every diagnostic attached to this
+// document. The current sources are:
+//
+//   - parse-time recoveries (SIR-PARSE-RECOVERABLE) populated by Parse on
+//     the panic-recovery path.
+//   - structural findings (SIR-VALIDATE-*) from Validate(d), which is
+//     re-run on every call so the result reflects the document's current
+//     IR state without the caller having to remember to re-validate.
+//
+// Workspace-level diagnostics (resolve, edge target binding, override
+// dangling, budget breach, orphan grace) are NOT included here — those
+// come from Workspace.ResolveDiagnostics, Render's BudgetReport, etc. —
+// because they're scoped to a workspace+view pair, not a single file.
+//
+// Diagnostics is nil-safe: calling on a nil receiver returns a nil slice.
+func (d *Document) Diagnostics() []Diagnostic {
+	if d == nil {
+		return nil
+	}
+	out := append([]Diagnostic(nil), d.parseDiagnostics...)
+	out = append(out, Validate(d)...)
+	return out
 }
 
 // Import declares that another sirena source file's symbols should be

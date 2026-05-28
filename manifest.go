@@ -34,6 +34,14 @@ type Manifest struct {
 	// OutputDir is the workspace-relative directory the renderer should
 	// write artifacts into. Corresponds to the `output_dir` YAML key.
 	OutputDir string
+	// SirenaVersion is the spec version the workspace was authored
+	// against, e.g. "0.1". Corresponds to the `sirena_version` YAML key.
+	// Empty when the manifest omits the directive — a hand-authored
+	// workspace is treated as the current spec minor. OpenWorkspace
+	// checks the field against CurrentSpecVersion via CheckVersion and
+	// refuses the workspace when the declared minor is newer than this
+	// build's.
+	SirenaVersion string
 	// Layout carries the workspace-default layout block. Nil when the
 	// manifest omits the `layout` key.
 	Layout *ManifestLayout
@@ -60,6 +68,7 @@ type manifestYAML struct {
 	DefaultPreset string              `yaml:"default_preset"`
 	Theme         string              `yaml:"theme"`
 	OutputDir     string              `yaml:"output_dir"`
+	SirenaVersion string              `yaml:"sirena_version"`
 	Layout        *manifestLayoutYAML `yaml:"layout"`
 }
 
@@ -84,6 +93,7 @@ func ParseManifest(src []byte) (*Manifest, error) {
 	m.DefaultPreset = raw.DefaultPreset
 	m.Theme = raw.Theme
 	m.OutputDir = raw.OutputDir
+	m.SirenaVersion = raw.SirenaVersion
 	if raw.Layout != nil {
 		m.Layout = &ManifestLayout{Direction: raw.Layout.Direction}
 	}

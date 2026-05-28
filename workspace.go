@@ -356,6 +356,15 @@ func OpenWorkspace(root string) (*Workspace, error) {
 			return nil, fmt.Errorf("sirena: parse %s: %w", manifestFileName, mErr)
 		}
 		ws.Manifest = m
+		// Version-skew check: refuse newer minors loudly so a partial
+		// read can't silently drop IR fields the build doesn't
+		// understand. Older minors are accepted with an upgrade-hint
+		// diagnostic surfaced through ResolveDiagnostics.
+		if vDiag, ok := CheckVersion(m.SirenaVersion); !ok {
+			return nil, fmt.Errorf("sirena: %s: %s: %s", manifestFileName, vDiag.Code, vDiag.Message)
+		} else if vDiag.Code != "" {
+			ws.synthDiagnostics = append(ws.synthDiagnostics, vDiag)
+		}
 	case errors.Is(err, fs.ErrNotExist):
 		// Missing manifest is OK; Manifest stays nil.
 	default:

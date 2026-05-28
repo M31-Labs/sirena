@@ -60,8 +60,10 @@ func MustParse(src []byte) *Document {
 
 // Parse runs the sirena grammar against src and returns a *Document with
 // byte-accurate Range fields on every node. Parse is panic-safe: a
-// recovered panic yields a Document carrying a SIR-PARSE-000 diagnostic
-// (mirroring mdpp's approach in parse.go).
+// recovered panic yields a Document carrying a SIR-PARSE-RECOVERABLE
+// diagnostic on its parseDiagnostics slice and an accompanying error.
+// Document.Diagnostics surfaces the entry alongside any structural
+// Validate findings so callers see one unified slice.
 //
 // Parse understands the full v0.1 grammar: imports, element / boundary /
 // edge declarations with optional metadata blocks and `@override`
@@ -70,10 +72,17 @@ func MustParse(src []byte) *Document {
 func Parse(src []byte) (doc *Document, err error) {
 	defer func() {
 		if r := recover(); r != nil {
+			msg := fmt.Sprintf("parser recovered from panic: %v", r)
 			doc = &Document{
 				Range: Range{Start: 0, End: len(src)},
+				parseDiagnostics: []Diagnostic{{
+					Code:     "SIR-PARSE-RECOVERABLE",
+					Severity: SeverityError,
+					Message:  msg,
+					Range:    Range{Start: 0, End: len(src)},
+				}},
 			}
-			err = fmt.Errorf("SIR-PARSE-000: parser recovered from panic: %v", r)
+			err = fmt.Errorf("SIR-PARSE-RECOVERABLE: %s", msg)
 		}
 	}()
 
