@@ -1,7 +1,3 @@
-// Package svg renders a sirena layout to deterministic, self-contained
-// SVG: bundled-font glyph paths instead of <text>, an allowlisted set of
-// CSS-variable design tokens, and a fixed element ordering so the same
-// layout always produces byte-identical output.
 package svg
 
 import "errors"
