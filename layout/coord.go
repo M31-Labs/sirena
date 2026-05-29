@@ -106,9 +106,9 @@ func assignCoords(layers [][]*sirena.Element, edges []*sirena.Edge, metrics Metr
 
 	ns := metrics.NodeSpacing
 	passes := []map[string]float64{
-		runPass(layerNames, adjList, width, ns, false),                                    // up, left
-		runPass(reverseEachLayer(layerNames), adjList, width, ns, true),                   // up, right
-		runPass(reverseLayerOrder(layerNames), adjList, width, ns, false),                 // down, left
+		runPass(layerNames, adjList, width, ns, false),                                     // up, left
+		runPass(reverseEachLayer(layerNames), adjList, width, ns, true),                    // up, right
+		runPass(reverseLayerOrder(layerNames), adjList, width, ns, false),                  // down, left
 		runPass(reverseEachLayer(reverseLayerOrder(layerNames)), adjList, width, ns, true), // down, right
 	}
 	centers := balance(passes, allNames)
