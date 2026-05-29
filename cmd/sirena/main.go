@@ -26,6 +26,8 @@ func main() {
 		exit = RunFmt(args, os.Stdout, os.Stderr)
 	case "lint":
 		exit = RunLint(args, os.Stdout, os.Stderr)
+	case "render":
+		exit = RunRender(args, os.Stdout, os.Stderr)
 	case "new":
 		exit = RunNew(args, os.Stdout, os.Stderr)
 	case "-h", "--help", "help":
