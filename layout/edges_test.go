@@ -1,6 +1,7 @@
 package layout
 
 import (
+	"math"
 	"testing"
 
 	"m31labs.dev/sirena"
@@ -147,5 +148,45 @@ func TestRoute_Deterministic(t *testing.T) {
 		if r1[0].Points[i] != r2[0].Points[i] {
 			t.Errorf("route point %d differs: %v vs %v", i, r1[0].Points[i], r2[0].Points[i])
 		}
+	}
+}
+
+func labeledRoute(label string) *sirena.EdgeRoute {
+	e := fwd("A", "B")
+	e.Label = label
+	return &sirena.EdgeRoute{Edge: e, Points: []sirena.Point{{X: 0, Y: 0}, {X: 200, Y: 0}}}
+}
+
+func TestLabel_MidpointNoCollision(t *testing.T) {
+	r := labeledRoute("reads")
+	placeLabels([]*sirena.EdgeRoute{r}, nil, DefaultMetrics())
+	if r.Label == nil {
+		t.Fatal("labeled edge got no label")
+	}
+	if math.Abs(r.Label.Anchor.X-100) > 1 || math.Abs(r.Label.Anchor.Y-(-8)) > 1 {
+		t.Errorf("label anchor = %v, want near (100, -8)", r.Label.Anchor)
+	}
+}
+
+func TestLabel_SlideAvoidsNode(t *testing.T) {
+	r := labeledRoute("reads")
+	node := &sirena.NodePlacement{
+		Node:   elem("mid"),
+		Bounds: sirena.Rect{Min: sirena.Point{X: 90, Y: -20}, Max: sirena.Point{X: 110, Y: 20}},
+	}
+	placeLabels([]*sirena.EdgeRoute{r}, []*sirena.NodePlacement{node}, DefaultMetrics())
+	if r.Label == nil {
+		t.Fatal("labeled edge got no label")
+	}
+	if r.Label.Bounds.Intersects(node.Bounds) {
+		t.Errorf("label bounds %v still overlap node %v after slide", r.Label.Bounds, node.Bounds)
+	}
+}
+
+func TestLabel_OnlyForLabeledEdges(t *testing.T) {
+	r := labeledRoute("")
+	placeLabels([]*sirena.EdgeRoute{r}, nil, DefaultMetrics())
+	if r.Label != nil {
+		t.Errorf("unlabeled edge got a label: %+v", r.Label)
 	}
 }

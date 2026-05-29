@@ -341,3 +341,135 @@ func simplify(pts []sirena.Point) []sirena.Point {
 	}
 	return append(out, dedup[len(dedup)-1])
 }
+
+const (
+	labelHeight = 16.0 // label box height
+	labelStep   = 8.0  // slide increment when avoiding collisions
+)
+
+// placeLabels positions a label for every routed edge that carries a
+// non-empty label. The label box is centered on the polyline's midpoint
+// and offset perpendicular (above a horizontal run). When it collides
+// with a node, it slides along the polyline toward the source first,
+// then toward the target, taking the first clear position. Routes whose
+// edge has no label are left with a nil Label.
+func placeLabels(routes []*sirena.EdgeRoute, placements []*sirena.NodePlacement, metrics Metrics) {
+	obstacles := make([]sirena.Rect, 0, len(placements))
+	for _, p := range placements {
+		obstacles = append(obstacles, p.Bounds)
+	}
+
+	for _, r := range routes {
+		if r.Edge == nil || r.Edge.Label == "" || len(r.Points) < 2 {
+			continue
+		}
+		w := metrics.TextWidth(r.Edge.Label)
+		total := polylineLength(r.Points)
+		mid := total / 2
+
+		at := func(d float64) (sirena.EdgeLabel, bool) {
+			pt, dir := pointAtDist(r.Points, d)
+			perp := perpUp(dir)
+			c := sirena.Point{X: pt.X + perp.X*labelHeight/2, Y: pt.Y + perp.Y*labelHeight/2}
+			b := sirena.Rect{
+				Min: sirena.Point{X: c.X - w/2, Y: c.Y - labelHeight/2},
+				Max: sirena.Point{X: c.X + w/2, Y: c.Y + labelHeight/2},
+			}
+			for _, o := range obstacles {
+				if b.Intersects(o) {
+					return sirena.EdgeLabel{}, false
+				}
+			}
+			return sirena.EdgeLabel{Text: r.Edge.Label, Anchor: c, Bounds: b}, true
+		}
+
+		var chosen sirena.EdgeLabel
+		found := false
+		for d := mid; d >= 0 && !found; d -= labelStep { // toward source
+			if lbl, ok := at(d); ok {
+				chosen, found = lbl, true
+			}
+		}
+		for d := mid + labelStep; d <= total && !found; d += labelStep { // toward target
+			if lbl, ok := at(d); ok {
+				chosen, found = lbl, true
+			}
+		}
+		if !found {
+			// Best effort: keep the label at the midpoint even though it
+			// could not be cleared.
+			pt, dir := pointAtDist(r.Points, mid)
+			perp := perpUp(dir)
+			c := sirena.Point{X: pt.X + perp.X*labelHeight/2, Y: pt.Y + perp.Y*labelHeight/2}
+			chosen = sirena.EdgeLabel{
+				Text:   r.Edge.Label,
+				Anchor: c,
+				Bounds: sirena.Rect{
+					Min: sirena.Point{X: c.X - w/2, Y: c.Y - labelHeight/2},
+					Max: sirena.Point{X: c.X + w/2, Y: c.Y + labelHeight/2},
+				},
+			}
+		}
+		r.Label = &chosen
+	}
+}
+
+// polylineLength returns the total arc length of a polyline.
+func polylineLength(pts []sirena.Point) float64 {
+	total := 0.0
+	for i := 1; i < len(pts); i++ {
+		total += dist(pts[i-1], pts[i])
+	}
+	return total
+}
+
+// pointAtDist returns the point at arc-length d along the polyline and
+// the unit direction of the segment it lies on.
+func pointAtDist(pts []sirena.Point, d float64) (sirena.Point, sirena.Point) {
+	if len(pts) == 0 {
+		return sirena.Point{}, sirena.Point{}
+	}
+	if len(pts) == 1 {
+		return pts[0], sirena.Point{}
+	}
+	if d <= 0 {
+		return pts[0], unit(pts[0], pts[1])
+	}
+	acc := 0.0
+	for i := 1; i < len(pts); i++ {
+		segLen := dist(pts[i-1], pts[i])
+		if acc+segLen >= d {
+			f := 0.0
+			if segLen > 0 {
+				f = (d - acc) / segLen
+			}
+			return sirena.Point{
+				X: pts[i-1].X + f*(pts[i].X-pts[i-1].X),
+				Y: pts[i-1].Y + f*(pts[i].Y-pts[i-1].Y),
+			}, unit(pts[i-1], pts[i])
+		}
+		acc += segLen
+	}
+	last := pts[len(pts)-1]
+	return last, unit(pts[len(pts)-2], last)
+}
+
+func dist(a, b sirena.Point) float64 { return math.Hypot(b.X-a.X, b.Y-a.Y) }
+
+func unit(a, b sirena.Point) sirena.Point {
+	d := dist(a, b)
+	if d == 0 {
+		return sirena.Point{}
+	}
+	return sirena.Point{X: (b.X - a.X) / d, Y: (b.Y - a.Y) / d}
+}
+
+// perpUp returns a unit perpendicular to dir, biased to point upward
+// (negative Y) so labels sit above horizontal runs.
+func perpUp(dir sirena.Point) sirena.Point {
+	p := sirena.Point{X: dir.Y, Y: -dir.X}
+	if p.Y > 0 {
+		p = sirena.Point{X: -p.X, Y: -p.Y}
+	}
+	return p
+}

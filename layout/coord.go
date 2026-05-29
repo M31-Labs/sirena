@@ -43,6 +43,16 @@ func (m Metrics) NodeHeight() float64 {
 	return defaultNodeHeight
 }
 
+// TextWidth measures a string's rendered width with no minimum-width
+// floor (unlike NodeWidth). Used for edge labels, which may be narrower
+// than a node box.
+func (m Metrics) TextWidth(s string) float64 {
+	if m.WidthOf != nil {
+		return m.WidthOf(s)
+	}
+	return defaultGlyphWidth * float64(len([]rune(s)))
+}
+
 // assignCoords assigns each element an absolute Rect using the
 // Brandes-Köpf horizontal coordinate algorithm (Brandes & Köpf 2002):
 // four vertical-alignment + horizontal-compaction passes (the up/down ×
