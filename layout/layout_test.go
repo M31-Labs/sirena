@@ -6,6 +6,33 @@ import (
 	"m31labs.dev/sirena"
 )
 
+func TestCompute_ForcePresetDispatches(t *testing.T) {
+	rv := &sirena.ResolvedView{
+		Source:   &sirena.ViewDecl{Name: "v"},
+		Elements: []*sirena.Element{elem("A"), elem("B"), elem("C"), elem("D")},
+		Edges:    []*sirena.Edge{fwd("A", "B"), fwd("B", "C"), fwd("C", "D")},
+	}
+	layered, _ := Compute(rv, LayoutOptions{})
+	forced, _ := Compute(rv, LayoutOptions{Preset: LayoutPresetForce})
+
+	lp := map[string]sirena.Rect{}
+	for _, np := range layered.NodePlacements {
+		lp[np.Node.Name] = np.Bounds
+	}
+	if len(forced.NodePlacements) != 4 {
+		t.Fatalf("force preset: got %d placements, want 4", len(forced.NodePlacements))
+	}
+	diff := false
+	for _, np := range forced.NodePlacements {
+		if lp[np.Node.Name] != np.Bounds {
+			diff = true
+		}
+	}
+	if !diff {
+		t.Errorf("force preset produced layout identical to layered")
+	}
+}
+
 func TestCompute_RespectsTopLevelHints(t *testing.T) {
 	a := &sirena.Element{Kind: sirena.ElementKindService, Name: "a"}
 	b := &sirena.Element{Kind: sirena.ElementKindService, Name: "b"}

@@ -64,6 +64,11 @@ func Compute(rv *sirena.ResolvedView, opts LayoutOptions) (*sirena.LayoutResult,
 
 	metrics := DefaultMetrics()
 
+	// The force preset skips the cell/skeleton pipeline entirely.
+	if opts.Preset == LayoutPresetForce {
+		return computeForce(rv, seed, metrics), nil
+	}
+
 	// Reconstruct containment: which elements / boundaries are children
 	// of an included boundary.
 	included := make(map[*sirena.Boundary]bool, len(rv.Boundaries))

@@ -8,6 +8,98 @@ import (
 	"m31labs.dev/sirena"
 )
 
+// computeForce builds a LayoutResult using the force-directed preset. It
+// flattens every element and summary (ignoring containment), positions
+// them with forceDirectedLayout, then gives each boundary a bounding box
+// that wraps its contained elements' force positions. Edges are routed
+// the same way as the layered preset.
+func computeForce(rv *sirena.ResolvedView, seed [32]byte, metrics Metrics) *sirena.LayoutResult {
+	lr := &sirena.LayoutResult{View: rv, Seed: seed}
+
+	var els []*sirena.Element
+	labelByName := map[string]string{}
+	for _, e := range rv.Elements {
+		els = append(els, e)
+		labelByName[e.Name] = e.Name
+	}
+	for _, s := range rv.Summaries {
+		if s.Boundary == nil {
+			continue
+		}
+		els = append(els, &sirena.Element{Name: s.Boundary.Name})
+		labelByName[s.Boundary.Name] = s.Label
+	}
+
+	m := metrics
+	base := m.WidthOf
+	m.WidthOf = func(nameKey string) float64 {
+		lbl := labelByName[nameKey]
+		if lbl == "" {
+			lbl = nameKey
+		}
+		if base != nil {
+			return base(lbl)
+		}
+		return nodeWidth(lbl)
+	}
+
+	coords := forceDirectedLayout(els, rv.Edges, seed, m)
+
+	for _, e := range rv.Elements {
+		lr.NodePlacements = append(lr.NodePlacements, &sirena.NodePlacement{Node: e, Bounds: coords[e.Name]})
+	}
+	for _, s := range rv.Summaries {
+		if s.Boundary == nil {
+			continue
+		}
+		lr.SummaryPlacements = append(lr.SummaryPlacements, &sirena.SummaryPlacement{Summary: s, Bounds: coords[s.Boundary.Name]})
+	}
+	for _, b := range rv.Boundaries {
+		if bb, ok := boundaryUnion(b, coords); ok {
+			lr.BoundaryPlacements = append(lr.BoundaryPlacements, &sirena.BoundaryPlacement{
+				Boundary:       b,
+				Bounds:         bb,
+				ChildrenBounds: bb,
+			})
+		}
+	}
+
+	if bounds, ok := unionAll(lr.NodePlacements, lr.SummaryPlacements, lr.BoundaryPlacements); ok {
+		lr.Bounds = bounds
+	}
+
+	ports := assignPorts(lr.NodePlacements, rv.Edges)
+	lr.EdgeRoutes = routeEdges(lr.NodePlacements, ports, rv.Edges)
+	placeLabels(lr.EdgeRoutes, lr.NodePlacements, m)
+	return lr
+}
+
+// boundaryUnion returns the bounding box of every element (recursively)
+// inside a boundary, using force-assigned coordinates.
+func boundaryUnion(b *sirena.Boundary, coords map[string]sirena.Rect) (sirena.Rect, bool) {
+	var out sirena.Rect
+	has := false
+	var walk func(*sirena.Boundary)
+	walk = func(bb *sirena.Boundary) {
+		for _, c := range bb.Children {
+			switch n := c.(type) {
+			case *sirena.Element:
+				if r, ok := coords[n.Name]; ok {
+					if !has {
+						out, has = r, true
+					} else {
+						out = unionRect(out, r)
+					}
+				}
+			case *sirena.Boundary:
+				walk(n)
+			}
+		}
+	}
+	walk(b)
+	return out, has
+}
+
 // forceDirectedLayout positions elements with a deterministic
 // Fruchterman-Reingold relaxation: repulsion between every node pair,
 // attraction along every in-scope edge, and a linearly cooling
