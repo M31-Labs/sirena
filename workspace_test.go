@@ -343,3 +343,37 @@ func TestOpenWorkspace_DeterministicFileOrder(t *testing.T) {
 		}
 	}
 }
+
+// TestOpenWorkspace_SkipsUnreadableDir confirms a permission-denied
+// subdirectory under the root is skipped rather than aborting the whole
+// walk, so a readable file alongside it still loads. (When run as root,
+// chmod 000 does not restrict access; the test then simply confirms the
+// happy path still finds the file.)
+func TestOpenWorkspace_SkipsUnreadableDir(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "ok.sir"), []byte("service api"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	locked := filepath.Join(dir, "locked")
+	if err := os.Mkdir(locked, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(locked, 0o000); err != nil {
+		t.Skipf("cannot chmod to exercise the skip: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
+
+	ws, err := sirena.OpenWorkspace(dir)
+	if err != nil {
+		t.Fatalf("OpenWorkspace should skip the unreadable dir, got: %v", err)
+	}
+	found := false
+	for _, f := range ws.Files {
+		if filepath.Base(f.Path) == "ok.sir" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("readable ok.sir not enumerated")
+	}
+}

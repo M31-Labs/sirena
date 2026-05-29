@@ -373,7 +373,17 @@ func OpenWorkspace(root string) (*Workspace, error) {
 
 	walkErr := filepath.WalkDir(abs, func(path string, d fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
-			return walkErr
+			// The root must be walkable, but an unreadable sibling
+			// directory under the chosen root should not abort enumeration
+			// of the rest of the workspace. Skip the offending subtree and
+			// continue.
+			if path == abs {
+				return walkErr
+			}
+			if d != nil && d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
 		}
 		// Skip dot-prefixed directories wholesale (but never the root
 		// itself, which may legitimately live under a dot-prefixed
