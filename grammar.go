@@ -1,5 +1,7 @@
 package sirena
 
+//go:generate go run ./internal/gengrammar
+
 import "github.com/odvcencio/gotreesitter/grammargen"
 
 // SirenaGrammar returns the v0.1 sirena grammar.

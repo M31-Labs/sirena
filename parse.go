@@ -1,18 +1,26 @@
 package sirena
 
 import (
+	_ "embed"
 	"fmt"
 	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/odvcencio/gotreesitter"
-	"github.com/odvcencio/gotreesitter/grammargen"
 )
 
-// sirenaLang is the compiled sirena tree-sitter language. Generated lazily
-// via sync.Once so importing the package does not pay the LR-table cost
-// until the first Parse call.
+// grammarBlob is the pre-compiled sirena language, serialized (gzipped gob)
+// at generate-time by ./internal/gengrammar. Loading it skips the LR-table
+// construction that grammargen.GenerateLanguage performs. Regenerate after
+// changing SirenaGrammar with `go generate ./...`.
+//
+//go:embed grammar.blob
+var grammarBlob []byte
+
+// sirenaLang is the sirena tree-sitter language, loaded lazily via sync.Once
+// from grammarBlob so importing the package does not pay the load cost until
+// the first Parse call.
 var (
 	sirenaLangOnce sync.Once
 	sirenaLang     *gotreesitter.Language
@@ -26,10 +34,11 @@ var (
 // without restructuring callers.
 var parserPools sync.Map
 
-// loadLanguage compiles the sirena grammar exactly once.
+// loadLanguage loads the pre-compiled sirena language from the embedded
+// grammar.blob exactly once.
 func loadLanguage() (*gotreesitter.Language, error) {
 	sirenaLangOnce.Do(func() {
-		sirenaLang, sirenaLangErr = grammargen.GenerateLanguage(SirenaGrammar())
+		sirenaLang, sirenaLangErr = gotreesitter.LoadLanguage(grammarBlob)
 	})
 	return sirenaLang, sirenaLangErr
 }
