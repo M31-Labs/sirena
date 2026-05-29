@@ -1,12 +1,11 @@
 // Package sirena: render entrypoint.
 //
 // render.go is the single, stable public entrypoint that wraps view
-// evaluation, budget enforcement, and (eventually) layout. For
-// v0.0.1-internal the layout side is a Plan-2 placeholder: Render
-// evaluates the budget and returns a nil *LayoutResult. The signature
-// is stable on purpose so downstream consumers (mdpp, the Sirena LSP,
-// the CLI) can wire against it now and graft layout in later without
-// touching call sites.
+// evaluation, budget enforcement, and layout. Render evaluates the
+// budget and, when it passes, delegates geometry to the layout engine.
+// The signature is stable on purpose so downstream consumers (mdpp, the
+// Sirena LSP, the CLI) wire against it without touching call sites as
+// the engine grows.
 //
 // The contract:
 //
@@ -15,9 +14,10 @@
 //	- StrictBudget = true: any breach surfaces as ErrBudgetExceeded
 //	  with the populated *BudgetReport; the *LayoutResult is nil.
 //	- StrictBudget = false: breaches still produce a non-nil report so
-//	  callers can warn, but the call succeeds.
-//	- No budget block or no breaches: report is nil; layout is nil
-//	  (placeholder for Plan 2); err is nil.
+//	  callers can warn, but the call succeeds and layout proceeds.
+//	- No budget block or no breaches: report is nil; layout is computed
+//	  when the layout engine is linked in (see RegisterLayoutComputer),
+//	  otherwise nil; err is nil.
 //
 // View pointers, including the embedded ViewDecl, are not mutated.
 package sirena
@@ -32,13 +32,42 @@ type RenderOptions struct {
 	StrictBudget bool
 }
 
-// LayoutResult is the positioned IR. Plans 2-6 will fill in geometric
-// fields (positions, sizes, edge routes); for v0.0.1-internal it is a
-// placeholder that carries only the resolved view so the public API
-// surface is already stable.
+// LayoutResult is the positioned IR: the resolved view plus the absolute
+// geometry the layout engine assigned to every node, summary, boundary,
+// and edge. The geometric value types live in geometry.go; the layout
+// algorithms that fill these slices live in m31labs.dev/sirena/layout.
 type LayoutResult struct {
+	// View is the resolved view this layout was computed from.
 	View *ResolvedView
-	// Geometry fields (positions, sizes, edge routes) live in Plan 2.
+	// Bounds is the overall canvas bounding box enclosing every
+	// placement and route.
+	Bounds Rect
+	// Seed is the deterministic layout seed; it equals ViewHash(View) on
+	// the production path. The force preset feeds it to its RNG.
+	Seed [32]byte
+	// NodePlacements positions every element in the view.
+	NodePlacements []*NodePlacement
+	// SummaryPlacements positions every collapsed-boundary summary.
+	SummaryPlacements []*SummaryPlacement
+	// BoundaryPlacements positions every visible boundary region.
+	BoundaryPlacements []*BoundaryPlacement
+	// EdgeRoutes carries the orthogonal route for every visible edge.
+	EdgeRoutes []*EdgeRoute
+}
+
+// layoutComputer is the layout engine, injected by the layout package's
+// init() via RegisterLayoutComputer. It is nil until the layout package
+// is linked into the build. Render delegates geometry to it; the
+// indirection exists solely to break the root↔layout import cycle (the
+// layout package imports this one for the IR and geometry types, so this
+// package must never import layout).
+var layoutComputer func(rv *ResolvedView) (*LayoutResult, error)
+
+// RegisterLayoutComputer wires the layout engine into Render. The layout
+// package calls this from its init(); application code never calls it
+// directly. Passing nil clears the registration (used by tests).
+func RegisterLayoutComputer(fn func(rv *ResolvedView) (*LayoutResult, error)) {
+	layoutComputer = fn
 }
 
 // ErrBudgetExceeded is the sentinel returned by Render when StrictBudget
@@ -47,24 +76,28 @@ type LayoutResult struct {
 var ErrBudgetExceeded = errors.New("sirena: view budget exceeded; see BudgetReport")
 
 // Render is the canonical entrypoint for turning a ResolvedView into a
-// rendered layout. For v0.0.1-internal the layout output is a Plan-2
-// placeholder (always nil); the budget side of the pipeline is
-// complete.
+// rendered layout.
 //
 // Behavior:
-//   - Calls EvaluateBudget(rv). If the report is nil (no budget or no
-//     breaches), Render returns (nil, nil, nil).
-//   - If StrictBudget is true and there are breaches, returns (nil,
-//     report, ErrBudgetExceeded).
-//   - Otherwise (permissive mode), returns (nil, report, nil) so the
-//     caller can warn while layout proceeds.
+//   - Calls EvaluateBudget(rv). If StrictBudget is true and there are
+//     breaches, returns (nil, report, ErrBudgetExceeded).
+//   - Otherwise, when the layout engine is linked in, computes geometry
+//     and returns (layout, report, nil). The report is non-nil only when
+//     there were breaches (permissive mode lets the caller warn).
+//   - When no layout engine is linked, returns (nil, report, nil) so
+//     budget-only callers still work.
 func Render(rv *ResolvedView, opts RenderOptions) (*LayoutResult, *BudgetReport, error) {
 	report := EvaluateBudget(rv)
 	if report != nil && opts.StrictBudget {
 		return nil, report, ErrBudgetExceeded
 	}
-	// Layout is Plan 2; for v0.0.1-internal we deliberately return a nil
-	// *LayoutResult so callers that branch on `layout != nil` get a
-	// stable signal that layout hasn't been wired yet.
+	if layoutComputer != nil {
+		lr, err := layoutComputer(rv)
+		if err != nil {
+			return nil, report, err
+		}
+		return lr, report, nil
+	}
+	// No layout engine linked: budget-only result, stable nil layout.
 	return nil, report, nil
 }

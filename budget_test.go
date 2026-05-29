@@ -144,8 +144,10 @@ func TestEvaluateBudget_LabelCharsBreach(t *testing.T) {
 }
 
 // TestRender_PermissiveReturnsReport drives the permissive Render path:
-// breaches surface as a non-nil report but the call still succeeds. The
-// LayoutResult is a Plan 2 placeholder (nil) for now.
+// breaches surface as a non-nil report but the call still succeeds and
+// layout proceeds. (This external test package blank-imports the layout
+// engine via render_test.go, so the computer is registered and layout is
+// populated.)
 func TestRender_PermissiveReturnsReport(t *testing.T) {
 	rv := buildResolvedView(t, map[string]string{
 		"sys.sir": `service api
@@ -159,8 +161,8 @@ service db`,
 	if err != nil {
 		t.Errorf("permissive Render shouldn't error: %v", err)
 	}
-	if layout != nil {
-		t.Errorf("layout placeholder; expected nil")
+	if layout == nil {
+		t.Errorf("permissive mode should still produce layout despite breach")
 	}
 	if report == nil {
 		t.Error("expected non-nil report on breach")
