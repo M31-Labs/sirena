@@ -22,3 +22,6 @@ go.work.sum
 dist/
 bin/
 /sirena
+
+# Font source for the glyph generator (output glyphs.go is committed)
+render/svg/font/generate/*.ttf
