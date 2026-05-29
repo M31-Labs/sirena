@@ -18,10 +18,11 @@ func init() {
 // boundaries against them. They live here (not in a config surface)
 // because v0.1 ships one tuned set.
 const (
-	defaultNodeHeight = 40.0
-	defaultNodeMinW   = 60.0
-	defaultGlyphWidth = 8.0
-	defaultLayerGap   = 24.0
+	defaultNodeHeight  = 40.0
+	defaultNodeMinW    = 60.0
+	defaultGlyphWidth  = 8.0
+	defaultLayerGap    = 24.0
+	defaultNodeSpacing = 48.0
 )
 
 // Compute is the public layout entrypoint. It turns a resolved view into
