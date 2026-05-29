@@ -16,6 +16,7 @@ Usage:
   sirena fmt [-w] [--check] <file>...      Format files
   sirena lint <workspace-or-file>          Run lint rules
   sirena render [-o f] [--theme t] <file>  Render a view or system to SVG
+  sirena emit [--format sir|svg] <go-dir>  Emit a Go module's package graph
   sirena new system|view <name>            Scaffold a new file
 
 See https://github.com/m31labs/sirena for documentation.`)

@@ -1,6 +1,7 @@
 // Command sirena is the diagram language toolchain entrypoint. It
 // dispatches the first positional argument as a subcommand — parse,
-// fmt, lint, new — into the Run* functions defined in this package.
+// fmt, lint, render, emit, new — into the Run* functions defined in this
+// package.
 // Each subcommand is a pure (args, stdout, stderr) -> int call so the
 // tests can exercise them with bytes.Buffer fixtures without spawning
 // processes.
@@ -28,6 +29,8 @@ func main() {
 		exit = RunLint(args, os.Stdout, os.Stderr)
 	case "render":
 		exit = RunRender(args, os.Stdout, os.Stderr)
+	case "emit":
+		exit = RunEmit(args, os.Stdout, os.Stderr)
 	case "new":
 		exit = RunNew(args, os.Stdout, os.Stderr)
 	case "-h", "--help", "help":

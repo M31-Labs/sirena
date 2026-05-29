@@ -112,36 +112,7 @@ func resolveRenderView(target string, stderr io.Writer) (*sirena.ResolvedView, i
 		}
 		return rv, 0
 	}
-	return synthAllView(doc), 0
-}
-
-// synthAllView builds a ResolvedView containing every element, boundary,
-// and edge in a document — the implicit view for a system file with no
-// explicit view declaration.
-func synthAllView(doc *sirena.Document) *sirena.ResolvedView {
-	rv := &sirena.ResolvedView{Source: &sirena.ViewDecl{Name: "all"}}
-	var addBoundary func(b *sirena.Boundary)
-	addBoundary = func(b *sirena.Boundary) {
-		rv.Boundaries = append(rv.Boundaries, b)
-		for _, c := range b.Children {
-			switch n := c.(type) {
-			case *sirena.Element:
-				rv.Elements = append(rv.Elements, n)
-			case *sirena.Boundary:
-				addBoundary(n)
-			case *sirena.Edge:
-				rv.Edges = append(rv.Edges, n)
-			}
-		}
-	}
-	for _, sys := range doc.Systems {
-		rv.Elements = append(rv.Elements, sys.Elements...)
-		for _, b := range sys.Boundaries {
-			addBoundary(b)
-		}
-		rv.Edges = append(rv.Edges, sys.Edges...)
-	}
-	return rv
+	return sirena.AllElementsView(doc), 0
 }
 
 // printBudget writes a budget report's breaches to w, one per line.
