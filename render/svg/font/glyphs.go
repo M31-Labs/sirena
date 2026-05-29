@@ -9,7 +9,7 @@ var (
 	EmSize  float64 = 2048
 )
 
-// Glyphs maps a rune to its outline (SVG path, em units, Y-up) and advance.
+// Glyphs maps a rune to its outline (SVG path, em units, Y-down) and advance.
 var Glyphs = map[rune]Glyph{
 	' ':    {Path: "", Advance: 576},
 	'!':    {Path: "M204 -479L192 -1490L396 -1490L383 -479L204 -479ZM295 13Q239 13 199 -26Q160 -66 160 -121Q160 -177 199 -216Q239 -256 295 -256Q351 -256 390 -216Q429 -177 429 -121Q429 -66 390 -26Q351 13 295 13Z", Advance: 589},

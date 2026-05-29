@@ -182,8 +182,10 @@ func writeEdges(b *bytes.Buffer, routes []*sirena.EdgeRoute) {
 
 // writeLabel emits a label as a group of glyph <path> elements centered
 // horizontally on center.X with the baseline near center.Y. Each glyph is
-// translated to the pen position and scaled (with a Y flip) from font
-// units to user units.
+// translated to the pen position and scaled from font units to user units.
+// The bundled glyph outlines are already in SVG's Y-down orientation (sfnt's
+// native output), so no Y flip is applied — scaling by a positive factor
+// keeps text upright.
 func writeLabel(b *bytes.Buffer, text string, center sirena.Point) {
 	if text == "" {
 		return
@@ -198,7 +200,7 @@ func writeLabel(b *bytes.Buffer, text string, center sirena.Point) {
 		g := font.Lookup(r)
 		if g.Path != "" {
 			fmt.Fprintf(b, `<path d="%s" transform="translate(%s %s) scale(%s %s)"/>`,
-				g.Path, num(penX), num(baseline), num(scale), num(-scale))
+				g.Path, num(penX), num(baseline), num(scale), num(scale))
 		}
 		penX += g.Advance * scale
 	}

@@ -4,8 +4,9 @@
 //
 //	go run ./render/svg/font/generate -ttf Inter-Regular.ttf -out render/svg/font/glyphs.go
 //
-// It emits each subset glyph's outline as an SVG path in font units with
-// the font's native Y-up coordinates, plus advance widths and the
+// It emits each subset glyph's outline as an SVG path in font units in
+// sfnt's native Y-down orientation (ascenders are negative Y, matching
+// SVG), plus advance widths and the
 // ascent/descent/em metrics. golang.org/x/image is a generator-only
 // dependency; the runtime font package imports only the baked output.
 package main
@@ -82,7 +83,7 @@ func main() {
 	fmt.Fprintf(&buf, "\tDescent float64 = %s\n", num(f2(metrics.Descent)))
 	fmt.Fprintf(&buf, "\tEmSize  float64 = %s\n", num(float64(f.UnitsPerEm())))
 	fmt.Fprintf(&buf, ")\n\n")
-	fmt.Fprintf(&buf, "// Glyphs maps a rune to its outline (SVG path, em units, Y-up) and advance.\n")
+	fmt.Fprintf(&buf, "// Glyphs maps a rune to its outline (SVG path, em units, Y-down) and advance.\n")
 	fmt.Fprintf(&buf, "var Glyphs = map[rune]Glyph{\n")
 	for _, e := range entries {
 		fmt.Fprintf(&buf, "\t%s: {Path: %q, Advance: %s},\n", runeLit(e.r), e.path, num(e.adv))

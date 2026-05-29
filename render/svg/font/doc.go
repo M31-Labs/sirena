@@ -27,8 +27,8 @@
 //
 // The generator (render/svg/font/generate) parses the font with
 // golang.org/x/image/font/sfnt and emits each glyph's outline as an SVG
-// path in font units with the font's native (Y-up) coordinate system;
-// the renderer flips Y and scales by fontSize/EmSize when placing a
-// glyph. x/image is a generator-only dependency — the runtime font
+// path in font units. sfnt emits outlines in SVG's Y-down orientation
+// (ascenders are negative Y), so the renderer scales by fontSize/EmSize
+// without a Y flip. x/image is a generator-only dependency — the runtime font
 // package imports only the baked data.
 package font
