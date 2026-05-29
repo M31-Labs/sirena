@@ -6,6 +6,28 @@ import (
 	"m31labs.dev/sirena"
 )
 
+func TestCompute_RoutesEdges(t *testing.T) {
+	rv := &sirena.ResolvedView{
+		Source:   &sirena.ViewDecl{Name: "two"},
+		Elements: []*sirena.Element{{Kind: sirena.ElementKindService, Name: "api"}, {Kind: sirena.ElementKindDatabase, Name: "db"}},
+		Edges:    []*sirena.Edge{{From: "api", To: "db", Kind: sirena.EdgeKindReads, Direction: sirena.DirForward}},
+	}
+	lr, err := Compute(rv, LayoutOptions{})
+	if err != nil {
+		t.Fatalf("Compute error: %v", err)
+	}
+	if len(lr.EdgeRoutes) != 1 {
+		t.Fatalf("EdgeRoutes = %d, want 1", len(lr.EdgeRoutes))
+	}
+	r := lr.EdgeRoutes[0]
+	if len(r.Points) < 2 {
+		t.Errorf("edge route has %d points, want >= 2", len(r.Points))
+	}
+	if !r.IsOrthogonal() {
+		t.Errorf("edge route not orthogonal: %v", r.Points)
+	}
+}
+
 func TestCompute_OneElement(t *testing.T) {
 	rv := &sirena.ResolvedView{
 		Source:   &sirena.ViewDecl{Name: "tiny"},

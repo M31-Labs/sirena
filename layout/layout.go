@@ -131,6 +131,14 @@ func Compute(rv *sirena.ResolvedView, opts LayoutOptions) (*sirena.LayoutResult,
 	if overallHas {
 		lr.Bounds = overall
 	}
+
+	// Route edges between placed nodes. v0.1 routes node-to-node edges;
+	// edges whose endpoint is a collapsed-boundary summary have no port
+	// and are skipped.
+	ports := assignPorts(lr.NodePlacements, rv.Edges)
+	lr.EdgeRoutes = routeEdges(lr.NodePlacements, ports, rv.Edges)
+	placeLabels(lr.EdgeRoutes, lr.NodePlacements, metrics)
+
 	return lr, nil
 }
 
