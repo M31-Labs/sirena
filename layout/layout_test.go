@@ -6,6 +6,38 @@ import (
 	"m31labs.dev/sirena"
 )
 
+func TestCompute_RespectsTopLevelHints(t *testing.T) {
+	a := &sirena.Element{Kind: sirena.ElementKindService, Name: "a"}
+	b := &sirena.Element{Kind: sirena.ElementKindService, Name: "b"}
+	bx := &sirena.Boundary{Kind: sirena.BoundaryKindTrust, Name: "X", Children: []sirena.Node{a}}
+	by := &sirena.Boundary{Kind: sirena.BoundaryKindTrust, Name: "Y", Children: []sirena.Node{b}}
+	rv := &sirena.ResolvedView{
+		Source:     &sirena.ViewDecl{Name: "v", Layout: &sirena.LayoutHints{Direction: "left-right"}},
+		Elements:   []*sirena.Element{a, b},
+		Boundaries: []*sirena.Boundary{bx, by},
+	}
+
+	lr, err := Compute(rv, LayoutOptions{})
+	if err != nil {
+		t.Fatalf("Compute error: %v", err)
+	}
+	if len(lr.BoundaryPlacements) != 2 {
+		t.Fatalf("BoundaryPlacements = %d, want 2", len(lr.BoundaryPlacements))
+	}
+	var bxR, byR sirena.Rect
+	for _, bp := range lr.BoundaryPlacements {
+		switch bp.Boundary.Name {
+		case "X":
+			bxR = bp.Bounds
+		case "Y":
+			byR = bp.Bounds
+		}
+	}
+	if bxR.Max.X > byR.Min.X {
+		t.Errorf("left-right: X should be entirely left of Y; X=%v Y=%v", bxR, byR)
+	}
+}
+
 func TestCompute_RoutesEdges(t *testing.T) {
 	rv := &sirena.ResolvedView{
 		Source:   &sirena.ViewDecl{Name: "two"},

@@ -95,42 +95,73 @@ func Compute(rv *sirena.ResolvedView, opts LayoutOptions) (*sirena.LayoutResult,
 	for _, s := range rv.Summaries {
 		items = append(items, cellItem{summary: s})
 	}
-	nps, sps, cellBounds := layoutCell(items, rv.Edges, metrics)
+	looseNps, looseSps, looseBounds := layoutCell(items, rv.Edges, metrics)
 
-	var bps []*sirena.BoundaryPlacement
-	overall := cellBounds
-	overallHas := len(items) > 0
-	yCursor := 0.0
-	if overallHas {
-		yCursor = cellBounds.Max.Y + skeletonPadding
+	// Each top-level region — the implicit loose region (nil boundary)
+	// plus every top-level boundary — is laid out at its own local origin,
+	// then arranged by the skeleton solver. Node/summary placements live
+	// outside the BoundaryPlacement tree, so we track them per region and
+	// translate them by the same delta the solver applies.
+	type regionContent struct {
+		region  *sirena.BoundaryPlacement
+		nps     []*sirena.NodePlacement
+		sps     []*sirena.SummaryPlacement
+		isLoose bool
 	}
-
-	// Each top-level boundary becomes a stacked region.
+	var contents []regionContent
+	if len(items) > 0 {
+		contents = append(contents, regionContent{
+			region:  &sirena.BoundaryPlacement{Bounds: looseBounds, ChildrenBounds: looseBounds},
+			nps:     looseNps,
+			sps:     looseSps,
+			isLoose: true,
+		})
+	}
 	for _, b := range rv.Boundaries {
 		if childBound[b] {
 			continue
 		}
 		bp, bnps, bsps := layoutBoundary(b, rv, included, metrics)
-		shiftBoundaryTree(bp, 0, yCursor)
-		shiftPlacements(bnps, bsps, 0, yCursor)
-		bps = append(bps, bp)
-		nps = append(nps, bnps...)
-		sps = append(sps, bsps...)
-		if overallHas {
-			overall = unionRect(overall, bp.Bounds)
-		} else {
-			overall = bp.Bounds
-			overallHas = true
-		}
-		yCursor = bp.Bounds.Max.Y + skeletonPadding
+		contents = append(contents, regionContent{region: bp, nps: bnps, sps: bsps})
 	}
 
-	lr.NodePlacements = nps
-	lr.SummaryPlacements = sps
-	lr.BoundaryPlacements = bps
-	if overallHas {
-		lr.Bounds = overall
+	if len(contents) == 0 {
+		return lr, nil
 	}
+
+	regions := make([]*sirena.BoundaryPlacement, len(contents))
+	preMin := make([]sirena.Point, len(contents))
+	for i, c := range contents {
+		regions[i] = c.region
+		preMin[i] = c.region.Bounds.Min
+	}
+
+	var hints *sirena.LayoutHints
+	if rv.Source != nil {
+		hints = rv.Source.Layout
+	}
+	canvas := solveSkeleton(regions, hints, metrics)
+
+	var (
+		allNps []*sirena.NodePlacement
+		allSps []*sirena.SummaryPlacement
+		bps    []*sirena.BoundaryPlacement
+	)
+	for i, c := range contents {
+		dx := c.region.Bounds.Min.X - preMin[i].X
+		dy := c.region.Bounds.Min.Y - preMin[i].Y
+		shiftPlacements(c.nps, c.sps, dx, dy)
+		allNps = append(allNps, c.nps...)
+		allSps = append(allSps, c.sps...)
+		if !c.isLoose {
+			bps = append(bps, c.region)
+		}
+	}
+
+	lr.NodePlacements = allNps
+	lr.SummaryPlacements = allSps
+	lr.BoundaryPlacements = bps
+	lr.Bounds = canvas
 
 	// Route edges between placed nodes. v0.1 routes node-to-node edges;
 	// edges whose endpoint is a collapsed-boundary summary have no port
