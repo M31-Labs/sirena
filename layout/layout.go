@@ -23,6 +23,17 @@ const (
 	defaultGlyphWidth  = 8.0
 	defaultLayerGap    = 24.0
 	defaultNodeSpacing = 48.0
+
+	// boundaryPadding is the inset between a boundary's content and its
+	// outer rectangle.
+	boundaryPadding = 16.0
+	// intraGap is the vertical gap between a boundary's own cell and its
+	// nested child boundaries.
+	intraGap = 24.0
+	// skeletonPadding is the gap between top-level regions (loose cell
+	// and each top-level boundary). Task 11 replaces the naive stacking
+	// that uses it with the constraint-solved skeleton.
+	skeletonPadding = 24.0
 )
 
 // Compute is the public layout entrypoint. It turns a resolved view into
@@ -30,11 +41,14 @@ const (
 // when set, otherwise derived from sirena.ViewHash(rv) so identical
 // views lay out identically across runs.
 //
-// This is the Phase-A skeleton: it stacks every element vertically and
-// gives boundaries the union bounding box. Phases B–E replace the body
-// with the real ranking, ordering, coordinate, routing, skeleton, and
-// force-directed algorithms; the signature and seeding contract are
-// already final.
+// The layered preset reconstructs the boundary containment tree from the
+// view's flat element/boundary/summary lists, lays out each top-level
+// boundary's subtree recursively (layoutCell per scope), lays out the
+// loose top-level elements and summaries as one cell, then arranges the
+// top-level regions. v0.1 stacks the top-level regions vertically; Task
+// 11 replaces that with the constraint-solved skeleton honoring the
+// view's layout hints. Edge routing (Phases C) and the force preset
+// (Phase E) graft into this entrypoint in later tasks.
 func Compute(rv *sirena.ResolvedView, opts LayoutOptions) (*sirena.LayoutResult, error) {
 	var seed [32]byte
 	if opts.Seed != nil {
@@ -48,34 +62,75 @@ func Compute(rv *sirena.ResolvedView, opts LayoutOptions) (*sirena.LayoutResult,
 		return lr, nil
 	}
 
-	// Stub placement: stack elements vertically, left-aligned at x=0.
-	y := 0.0
-	for _, e := range rv.Elements {
-		w := nodeWidth(e.Name)
-		np := &sirena.NodePlacement{
-			Node: e,
-			Bounds: sirena.Rect{
-				Min: sirena.Point{X: 0, Y: y},
-				Max: sirena.Point{X: w, Y: y + defaultNodeHeight},
-			},
-		}
-		lr.NodePlacements = append(lr.NodePlacements, np)
-		y += defaultNodeHeight + defaultLayerGap
-	}
+	metrics := DefaultMetrics()
 
-	bounds := unionPlacements(lr.NodePlacements)
-	lr.Bounds = bounds
-
-	// Stub: every boundary takes the overall union box. Phase C/D give
-	// each boundary its own packed region.
+	// Reconstruct containment: which elements / boundaries are children
+	// of an included boundary.
+	included := make(map[*sirena.Boundary]bool, len(rv.Boundaries))
 	for _, b := range rv.Boundaries {
-		lr.BoundaryPlacements = append(lr.BoundaryPlacements, &sirena.BoundaryPlacement{
-			Boundary:       b,
-			Bounds:         bounds,
-			ChildrenBounds: bounds,
-		})
+		included[b] = true
+	}
+	childElem := map[*sirena.Element]bool{}
+	childBound := map[*sirena.Boundary]bool{}
+	for _, b := range rv.Boundaries {
+		for _, c := range b.Children {
+			switch n := c.(type) {
+			case *sirena.Element:
+				childElem[n] = true
+			case *sirena.Boundary:
+				if included[n] {
+					childBound[n] = true
+				}
+			}
+		}
 	}
 
+	// Loose top-level elements + every summary form one cell.
+	var items []cellItem
+	for _, e := range rv.Elements {
+		if !childElem[e] {
+			items = append(items, cellItem{element: e})
+		}
+	}
+	for _, s := range rv.Summaries {
+		items = append(items, cellItem{summary: s})
+	}
+	nps, sps, cellBounds := layoutCell(items, rv.Edges, metrics)
+
+	var bps []*sirena.BoundaryPlacement
+	overall := cellBounds
+	overallHas := len(items) > 0
+	yCursor := 0.0
+	if overallHas {
+		yCursor = cellBounds.Max.Y + skeletonPadding
+	}
+
+	// Each top-level boundary becomes a stacked region.
+	for _, b := range rv.Boundaries {
+		if childBound[b] {
+			continue
+		}
+		bp, bnps, bsps := layoutBoundary(b, rv, included, metrics)
+		shiftBoundaryTree(bp, 0, yCursor)
+		shiftPlacements(bnps, bsps, 0, yCursor)
+		bps = append(bps, bp)
+		nps = append(nps, bnps...)
+		sps = append(sps, bsps...)
+		if overallHas {
+			overall = unionRect(overall, bp.Bounds)
+		} else {
+			overall = bp.Bounds
+			overallHas = true
+		}
+		yCursor = bp.Bounds.Max.Y + skeletonPadding
+	}
+
+	lr.NodePlacements = nps
+	lr.SummaryPlacements = sps
+	lr.BoundaryPlacements = bps
+	if overallHas {
+		lr.Bounds = overall
+	}
 	return lr, nil
 }
 
@@ -88,19 +143,6 @@ func nodeWidth(label string) float64 {
 		return defaultNodeMinW
 	}
 	return w
-}
-
-// unionPlacements returns the bounding box enclosing every node
-// placement. An empty input yields the zero rectangle.
-func unionPlacements(nps []*sirena.NodePlacement) sirena.Rect {
-	if len(nps) == 0 {
-		return sirena.Rect{}
-	}
-	out := nps[0].Bounds
-	for _, np := range nps[1:] {
-		out = unionRect(out, np.Bounds)
-	}
-	return out
 }
 
 // unionRect returns the smallest rectangle containing both a and b.
