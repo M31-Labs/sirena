@@ -73,3 +73,79 @@ func TestPort_Deterministic(t *testing.T) {
 		}
 	}
 }
+
+func routeOne(t *testing.T, pl []*sirena.NodePlacement, e *sirena.Edge) *sirena.EdgeRoute {
+	t.Helper()
+	ports := assignPorts(pl, []*sirena.Edge{e})
+	routes := routeEdges(pl, ports, []*sirena.Edge{e})
+	if len(routes) != 1 {
+		t.Fatalf("got %d routes, want 1", len(routes))
+	}
+	return routes[0]
+}
+
+func TestRoute_StraightSameLayer(t *testing.T) {
+	a := np("A", 0, 0, 80, 40)
+	b := np("B", 160, 0, 240, 40)
+	pl := []*sirena.NodePlacement{a, b}
+
+	r := routeOne(t, pl, fwd("A", "B"))
+	if len(r.Points) != 2 {
+		t.Errorf("aligned same-row edge should be a 2-point line; got %d points: %v", len(r.Points), r.Points)
+	}
+	if !r.IsOrthogonal() {
+		t.Errorf("route not orthogonal: %v", r.Points)
+	}
+}
+
+func TestRoute_ZShapedInterLayer(t *testing.T) {
+	a := np("A", 0, 0, 80, 40)
+	mid := np("B", 0, 60, 80, 100)
+	c := np("C", 0, 120, 80, 160)
+	pl := []*sirena.NodePlacement{a, mid, c}
+
+	r := routeOne(t, pl, fwd("A", "C"))
+	if len(r.Points) < 4 {
+		t.Errorf("A→C around B should bend (≥4 points); got %d: %v", len(r.Points), r.Points)
+	}
+	if !r.IsOrthogonal() {
+		t.Errorf("route not orthogonal: %v", r.Points)
+	}
+}
+
+func TestRoute_AvoidsNodeRectangles(t *testing.T) {
+	a := np("A", 0, 0, 80, 40)
+	mid := np("B", 120, 0, 200, 40)
+	c := np("C", 240, 0, 320, 40)
+	pl := []*sirena.NodePlacement{a, mid, c}
+
+	r := routeOne(t, pl, fwd("A", "C"))
+	for i := 1; i < len(r.Points); i++ {
+		if segCrossesRect(r.Points[i-1], r.Points[i], mid.Bounds) {
+			t.Errorf("segment %v→%v passes through B %v", r.Points[i-1], r.Points[i], mid.Bounds)
+		}
+	}
+	if !r.IsOrthogonal() {
+		t.Errorf("route not orthogonal: %v", r.Points)
+	}
+}
+
+func TestRoute_Deterministic(t *testing.T) {
+	a := np("A", 0, 0, 80, 40)
+	mid := np("B", 120, 0, 200, 40)
+	c := np("C", 240, 0, 320, 40)
+	pl := []*sirena.NodePlacement{a, mid, c}
+	e := fwd("A", "C")
+	ports := assignPorts(pl, []*sirena.Edge{e})
+
+	r1 := routeEdges(pl, ports, []*sirena.Edge{e})
+	r2 := routeEdges(pl, ports, []*sirena.Edge{e})
+	if len(r1[0].Points) != len(r2[0].Points) {
+		t.Fatalf("route length differs across runs")
+	}
+	for i := range r1[0].Points {
+		if r1[0].Points[i] != r2[0].Points[i] {
+			t.Errorf("route point %d differs: %v vs %v", i, r1[0].Points[i], r2[0].Points[i])
+		}
+	}
+}
