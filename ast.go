@@ -144,6 +144,11 @@ const (
 	BoundaryKindDeployment
 	// BoundaryKindTeam is an organizational ownership boundary.
 	BoundaryKindTeam
+	// BoundaryKindGroup is a generic visual grouping boundary used by
+	// ingesters (e.g. Mermaid subgraph). It is the boundary analog of
+	// ElementKindNode: a catchall kind when no typed boundary keyword applies.
+	// Added in Phase D (ADR 0002) as a permitted additive enum value per ADR 0001.
+	BoundaryKindGroup
 )
 
 // String returns the source keyword for this kind, e.g. "trust".
@@ -157,6 +162,8 @@ func (k BoundaryKind) String() string {
 		return "deployment"
 	case BoundaryKindTeam:
 		return "team"
+	case BoundaryKindGroup:
+		return "group"
 	default:
 		return "unknown"
 	}
@@ -174,6 +181,8 @@ func boundaryKindForKeyword(kw string) BoundaryKind {
 		return BoundaryKindDeployment
 	case "team":
 		return BoundaryKindTeam
+	case "group":
+		return BoundaryKindGroup
 	default:
 		return BoundaryKindUnknown
 	}

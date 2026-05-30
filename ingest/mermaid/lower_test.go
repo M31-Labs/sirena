@@ -150,7 +150,89 @@ func TestLower_DeduplicatesElements(t *testing.T) {
 	}
 }
 
+// TestLower_SubgraphToBoundary covers D2: subgraph → Boundary with children +
+// top-level element + edges in sys.Edges regardless of containment.
+func TestLower_SubgraphToBoundary(t *testing.T) {
+	src := "flowchart TB\n  subgraph net[Network]\n    api[API] --> db[(DB)]\n  end\n  client --> api\n"
+	doc, _, err := Parse([]byte(src), Options{})
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+	if len(doc.Systems) != 1 {
+		t.Fatalf("want 1 system, got %d", len(doc.Systems))
+	}
+	sys := doc.Systems[0]
+
+	// Exactly 1 boundary.
+	if got := len(sys.Boundaries); got != 1 {
+		t.Fatalf("want 1 boundary, got %d", got)
+	}
+	b := sys.Boundaries[0]
+	if b.Name != "net" {
+		t.Errorf("boundary Name = %q, want %q", b.Name, "net")
+	}
+	if b.Kind != sirena.BoundaryKindGroup {
+		t.Errorf("boundary Kind = %v, want BoundaryKindGroup", b.Kind)
+	}
+	// Label metadata.
+	labelVal, ok := b.Metadata["label"]
+	if !ok {
+		t.Error("boundary missing metadata key \"label\"")
+	} else {
+		s, ok := labelVal.(sirena.String)
+		if !ok {
+			t.Errorf("boundary metadata[label] type %T, want sirena.String", labelVal)
+		} else if s.Value != "Network" {
+			t.Errorf("boundary metadata[label] = %q, want %q", s.Value, "Network")
+		}
+	}
+	// 2 child Elements: api and db.
+	if got := len(b.Children); got != 2 {
+		t.Fatalf("want 2 boundary children, got %d", got)
+	}
+	var childNames []string
+	for _, c := range b.Children {
+		el, ok := c.(*sirena.Element)
+		if !ok {
+			t.Errorf("boundary child type %T, want *sirena.Element", c)
+			continue
+		}
+		childNames = append(childNames, el.Name)
+	}
+	if !contains(childNames, "api") || !contains(childNames, "db") {
+		t.Errorf("boundary children = %v, want [api db] (any order)", childNames)
+	}
+
+	// 1 top-level element: client.
+	if got := len(sys.Elements); got != 1 {
+		t.Fatalf("want 1 top-level element, got %d", got)
+	}
+	if sys.Elements[0].Name != "client" {
+		t.Errorf("top-level element Name = %q, want %q", sys.Elements[0].Name, "client")
+	}
+
+	// 2 edges: api→db and client→api, both in sys.Edges.
+	if got := len(sys.Edges); got != 2 {
+		t.Fatalf("want 2 edges, got %d", got)
+	}
+	if findEdge(sys.Edges, "api", "db") == nil {
+		t.Error("edge api→db not found in sys.Edges")
+	}
+	if findEdge(sys.Edges, "client", "api") == nil {
+		t.Error("edge client→api not found in sys.Edges")
+	}
+}
+
 // ── helpers ──────────────────────────────────────────────────────────────────
+
+func contains(ss []string, s string) bool {
+	for _, v := range ss {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}
 
 func findElement(els []*sirena.Element, name string) *sirena.Element {
 	for _, e := range els {

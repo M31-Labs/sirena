@@ -542,6 +542,7 @@ func TestIR_BoundaryKindString(t *testing.T) {
 		BoundaryKindNetwork:    "network",
 		BoundaryKindDeployment: "deployment",
 		BoundaryKindTeam:       "team",
+		BoundaryKindGroup:      "group",
 	}
 	for k, want := range cases {
 		if got := k.String(); got != want {
@@ -659,7 +660,7 @@ func TestIR_ElementKindForKeyword_RoundTrip(t *testing.T) {
 // TestIR_BoundaryKindForKeyword_RoundTrip asserts every non-Unknown
 // BoundaryKind survives a String() → boundaryKindForKeyword() round-trip.
 func TestIR_BoundaryKindForKeyword_RoundTrip(t *testing.T) {
-	for k := BoundaryKindTrust; k <= BoundaryKindTeam; k++ {
+	for k := BoundaryKindTrust; k <= BoundaryKindGroup; k++ {
 		if got := boundaryKindForKeyword(k.String()); got != k {
 			t.Errorf("round trip BoundaryKind(%v): got %v", k, got)
 		}

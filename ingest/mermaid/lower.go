@@ -23,36 +23,113 @@ type lowerer struct {
 
 // lowerRoot walks the CST root and returns a *sirena.Document.
 // Phase B/C populate sys.Elements / sys.Edges.
-// Phase D will add sys.Boundaries for subgraphs.
+// Phase D adds sys.Boundaries for subgraphs.
 func (l *lowerer) lowerRoot(root *gt.Node) *sirena.Document {
 	l.elemOrder = nil
 	l.elemMap = map[string]*sirena.Element{}
 
 	sys := &sirena.SystemDecl{}
 
-	// The CST shape: source_file → diagram_flow → flow_stmt_vertice*
+	// The CST shape: source_file → diagram_flow → (flow_stmt_vertice | flow_stmt_subgraph)*
 	// Walk all named children of root looking for diagram_flow.
 	for i := 0; i < root.NamedChildCount(); i++ {
 		df := root.NamedChild(i)
 		if df.Type(l.lang) != "diagram_flow" {
 			continue
 		}
-		// Walk flow_stmt_vertice children of diagram_flow.
+		// Walk children of diagram_flow: vertices and subgraphs.
 		for j := 0; j < df.NamedChildCount(); j++ {
 			stmt := df.NamedChild(j)
-			if stmt.Type(l.lang) != "flow_stmt_vertice" {
-				continue
+			switch stmt.Type(l.lang) {
+			case "flow_stmt_vertice":
+				l.lowerStmt(stmt, sys)
+			case "flow_stmt_subgraph":
+				b := l.lowerSubgraph(stmt, sys)
+				if b != nil {
+					sys.Boundaries = append(sys.Boundaries, b)
+				}
 			}
-			l.lowerStmt(stmt, sys)
 		}
 	}
 
-	// Append elements in source declaration order.
+	// Append top-level elements in source declaration order.
+	// Elements that were registered as part of a boundary are tracked in
+	// elemMap for dedup (cross-boundary edge references) but are NOT
+	// appended to sys.Elements — they live in the boundary's Children.
 	for _, name := range l.elemOrder {
 		sys.Elements = append(sys.Elements, l.elemMap[name])
 	}
 
 	return &sirena.Document{Systems: []*sirena.SystemDecl{sys}}
+}
+
+// lowerSubgraph lowers a flow_stmt_subgraph node to a *sirena.Boundary.
+// CST shape:
+//
+//	flow_stmt_subgraph
+//	  subgraph            (keyword, not named)
+//	  flow_vertex_id      (boundary id)
+//	  [                   (optional label bracket, not named)
+//	  flow_vertex_text    (optional label text)
+//	  ]
+//	  flow_stmt_subgraph_inner
+//	    flow_stmt_vertice*
+//	    flow_stmt_subgraph*  (nested subgraphs)
+//	  end
+//
+// Inner vertices become boundary Children (as *sirena.Element).
+// Inner edges go to sys.Edges regardless of containment.
+// Nested subgraphs recurse and become child *sirena.Boundary entries.
+func (l *lowerer) lowerSubgraph(node *gt.Node, sys *sirena.SystemDecl) *sirena.Boundary {
+	// Extract boundary id.
+	idNode := namedChildOfType(node, l.lang, "flow_vertex_id")
+	if idNode == nil {
+		return nil
+	}
+	id := string(l.src[idNode.StartByte():idNode.EndByte()])
+
+	// Extract optional label from flow_vertex_text.
+	label := ""
+	if labelNode := namedChildOfType(node, l.lang, "flow_vertex_text"); labelNode != nil {
+		label = string(l.src[labelNode.StartByte():labelNode.EndByte()])
+	}
+
+	b := &sirena.Boundary{
+		Kind:     sirena.BoundaryKindGroup,
+		Name:     id,
+		Metadata: map[string]sirena.Value{},
+	}
+	if label != "" {
+		b.Metadata["label"] = sirena.String{Value: label}
+	}
+
+	// Walk the inner block.
+	inner := namedChildOfType(node, l.lang, "flow_stmt_subgraph_inner")
+	if inner != nil {
+		for k := 0; k < inner.NamedChildCount(); k++ {
+			child := inner.NamedChild(k)
+			switch child.Type(l.lang) {
+			case "flow_stmt_vertice":
+				// Lower the statement; collect any newly registered elements
+				// into the boundary's Children rather than sys.Elements.
+				beforeOrder := append([]string(nil), l.elemOrder...)
+				l.lowerStmt(child, sys)
+				// Any element added after beforeOrder is a new child of this boundary.
+				for _, name := range l.elemOrder[len(beforeOrder):] {
+					b.Children = append(b.Children, l.elemMap[name])
+				}
+				// Remove new elements from elemOrder so they don't land in sys.Elements.
+				l.elemOrder = beforeOrder
+			case "flow_stmt_subgraph":
+				nested := l.lowerSubgraph(child, sys)
+				if nested != nil {
+					b.Children = append(b.Children, nested)
+				}
+			}
+		}
+	}
+
+	return b
 }
 
 // lowerStmt walks one flow_stmt_vertice, which has an alternating sequence of
