@@ -3,7 +3,6 @@ package mermaid
 import "testing"
 
 func TestParse_MinimalFlowchart_NoError(t *testing.T) {
-	t.Skip("pending Phase B/C lowering — see plan")
 	doc, diags, err := Parse([]byte("flowchart LR\n  a --> b\n"), Options{})
 	if err != nil {
 		t.Fatalf("Parse error: %v", err)
