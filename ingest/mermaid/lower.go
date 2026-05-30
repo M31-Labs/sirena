@@ -24,31 +24,46 @@ type lowerer struct {
 // lowerRoot walks the CST root and returns a *sirena.Document.
 // Phase B/C populate sys.Elements / sys.Edges.
 // Phase D adds sys.Boundaries for subgraphs.
+// Phase E adds diagnostic emission for NOT-A-GRAPH, PARSE, and UNSUPPORTED.
 func (l *lowerer) lowerRoot(root *gt.Node) *sirena.Document {
 	l.elemOrder = nil
 	l.elemMap = map[string]*sirena.Element{}
 
+	// Phase E: detect non-flowchart diagram types.
+	// Scan ALL named children of root for diagram_flow; a leading directive or
+	// comment can occupy earlier slots so we must not key on just the first child.
+	df := checkForDiagramFlow(root, l.lang)
+	if df == nil {
+		d := l.mkDiag(
+			"SIR-MERMAID-NOT-A-GRAPH",
+			sirena.SeverityError,
+			"Input is not a Mermaid flowchart (no diagram_flow node found)",
+			root,
+		)
+		l.diags = append(l.diags, d)
+		l.fatal = notAGraphError
+		return nil
+	}
+
+	// Phase E: check for root-level parse errors (broken statements).
+	l.checkParseErrors(root)
+
 	sys := &sirena.SystemDecl{}
 
-	// The CST shape: source_file → diagram_flow → (flow_stmt_vertice | flow_stmt_subgraph)*
-	// Walk all named children of root looking for diagram_flow.
-	for i := 0; i < root.NamedChildCount(); i++ {
-		df := root.NamedChild(i)
-		if df.Type(l.lang) != "diagram_flow" {
-			continue
-		}
-		// Walk children of diagram_flow: vertices and subgraphs.
-		for j := 0; j < df.NamedChildCount(); j++ {
-			stmt := df.NamedChild(j)
-			switch stmt.Type(l.lang) {
-			case "flow_stmt_vertice":
-				l.lowerStmt(stmt, sys)
-			case "flow_stmt_subgraph":
-				b := l.lowerSubgraph(stmt, sys)
-				if b != nil {
-					sys.Boundaries = append(sys.Boundaries, b)
-				}
+	// Walk children of diagram_flow: vertices, subgraphs, and unsupported stmts.
+	for j := 0; j < df.NamedChildCount(); j++ {
+		stmt := df.NamedChild(j)
+		switch stmt.Type(l.lang) {
+		case "flow_stmt_vertice":
+			l.lowerStmt(stmt, sys)
+		case "flow_stmt_subgraph":
+			b := l.lowerSubgraph(stmt, sys)
+			if b != nil {
+				sys.Boundaries = append(sys.Boundaries, b)
 			}
+		default:
+			// Phase E: emit UNSUPPORTED for any other flow_stmt_* type.
+			l.checkUnsupportedStmt(stmt)
 		}
 	}
 
