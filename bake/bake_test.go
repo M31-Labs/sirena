@@ -281,6 +281,137 @@ func TestBake_FailureNonDestructive(t *testing.T) {
 	}
 }
 
+// ── Test 5b: sirena via fence.Render ─────────────────────────────────────────
+
+// TestBake_SirenaViaFence confirms the sirena render path uses fence.Render
+// and produces a valid SVG for a sir block. It also verifies that an empty
+// sirena body produces a block failure (not a hard error) and leaves the
+// source unchanged.
+func TestBake_SirenaViaFence(t *testing.T) {
+	t.Run("valid sir block bakes to SVG", func(t *testing.T) {
+		md := "```sir\n" + validSirenaBody + "```\n"
+		mdPath := tempMD(t, "sirfence.md", md)
+		dir := filepath.Dir(mdPath)
+
+		res, err := bake.Bake(mdPath, bake.Options{})
+		if err != nil {
+			t.Fatalf("Bake returned error: %v", err)
+		}
+		if res.BlocksBaked != 1 {
+			t.Errorf("BlocksBaked = %d, want 1", res.BlocksBaked)
+		}
+		svg1 := filepath.Join(dir, "sirfence.1.svg")
+		assertSVG(t, "sirfence.1.svg", readFile(t, svg1))
+	})
+
+	t.Run("empty sirena body records block failure and preserves source", func(t *testing.T) {
+		// An empty fence body produces no SVG from fence.Render.
+		const origMD = "```sirena\n```\n"
+		mdPath := tempMD(t, "empty_sirena.md", origMD)
+
+		res, err := bake.Bake(mdPath, bake.Options{})
+		// Must return non-nil error (block failure).
+		if err == nil {
+			t.Errorf("expected non-nil error for empty sirena body, got nil")
+		}
+		if len(res.BlockErrors) == 0 {
+			t.Errorf("expected BlockErrors to be non-empty")
+		}
+		// Source must be preserved unchanged.
+		got := string(readFile(t, mdPath))
+		if got != origMD {
+			t.Errorf("source modified unexpectedly\ngot:\n%s\nwant:\n%s", got, origMD)
+		}
+	})
+}
+
+// ── Test 6: file permissions preserved ───────────────────────────────────────
+
+func TestBake_PreservesFileMode(t *testing.T) {
+	md := "```mermaid\n" + validMermaidBody + "```\n"
+	dir := t.TempDir()
+	mdPath := filepath.Join(dir, "perms.md")
+	if err := os.WriteFile(mdPath, []byte(md), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := bake.Bake(mdPath, bake.Options{}); err != nil {
+		t.Fatalf("Bake returned error: %v", err)
+	}
+
+	fi, err := os.Stat(mdPath)
+	if err != nil {
+		t.Fatalf("stat after bake: %v", err)
+	}
+	if got := fi.Mode().Perm(); got != 0o644 {
+		t.Errorf("file mode = %04o, want 0644", got)
+	}
+}
+
+// ── Test 7: byte-identical skip (no mtime churn) ──────────────────────────────
+
+func TestBake_ByteIdenticalSkip(t *testing.T) {
+	t.Run("no-fence file is not rewritten", func(t *testing.T) {
+		const content = "# Plain\n\nNo fences here.\n"
+		mdPath := tempMD(t, "plain2.md", content)
+
+		fi0, err := os.Stat(mdPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		mtime0 := fi0.ModTime()
+
+		if _, err := bake.Bake(mdPath, bake.Options{}); err != nil {
+			t.Fatalf("Bake returned error: %v", err)
+		}
+
+		fi1, err := os.Stat(mdPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Content must be identical.
+		if string(readFile(t, mdPath)) != content {
+			t.Errorf("content changed for no-fence file")
+		}
+		// Mtime must be unchanged (file was not touched).
+		if !fi1.ModTime().Equal(mtime0) {
+			t.Errorf("mtime changed for no-fence file: %v → %v", mtime0, fi1.ModTime())
+		}
+	})
+
+	t.Run("all-failed file is not rewritten", func(t *testing.T) {
+		const origMD = "```mermaid\n" + invalidMermaidBody + "```\n"
+		mdPath := tempMD(t, "allfail.md", origMD)
+
+		fi0, err := os.Stat(mdPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		mtime0 := fi0.ModTime()
+
+		res, err := bake.Bake(mdPath, bake.Options{})
+		if err == nil {
+			t.Errorf("expected non-nil error for invalid block")
+		}
+		if len(res.BlockErrors) == 0 {
+			t.Errorf("expected BlockErrors")
+		}
+
+		// Content must be identical.
+		if string(readFile(t, mdPath)) != origMD {
+			t.Errorf("content changed when all blocks failed")
+		}
+		// Mtime must be unchanged.
+		fi1, err := os.Stat(mdPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !fi1.ModTime().Equal(mtime0) {
+			t.Errorf("mtime changed when all blocks failed: %v → %v", mtime0, fi1.ModTime())
+		}
+	})
+}
+
 // ── Test 5: CRLF body ─────────────────────────────────────────────────────────
 
 func TestBake_CRLFBody(t *testing.T) {

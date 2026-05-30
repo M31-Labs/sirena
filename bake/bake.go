@@ -1,6 +1,7 @@
 package bake
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"strings"
 
 	"m31labs.dev/sirena"
+	"m31labs.dev/sirena/fence"
 	"m31labs.dev/sirena/ingest/mermaid"
 	_ "m31labs.dev/sirena/layout" // registers the layout engine into sirena.Render
 	"m31labs.dev/sirena/render/svg"
@@ -99,7 +101,7 @@ func Bake(mdPath string, opts Options) (Result, error) {
 		body := strings.ReplaceAll(blk.Body, "\r", "")
 
 		// Render the block to SVG.
-		svgBytes, rerr := renderBlock(blk.Lang, body, opts.Infer, theme)
+		svgBytes, rerr := renderBlock(blk.Lang, body, opts, theme)
 		if rerr != nil {
 			// Render failure: keep the original source unchanged.
 			out.Write(src[blk.Start:blk.End])
@@ -129,13 +131,29 @@ func Bake(mdPath string, opts Options) (Result, error) {
 	// Append any trailing content after the last block.
 	out.Write(src[prevEnd:])
 
+	// Fix 3: skip the write entirely when the output is byte-identical to the
+	// original source (covers no-renderable-blocks and all-blocks-failed cases).
+	outBytes := []byte(out.String())
+	if bytes.Equal(outBytes, src) {
+		if len(res.BlockErrors) > 0 {
+			return res, joinBlockErrors(res.BlockErrors)
+		}
+		return res, nil
+	}
+
+	// Fix 2: capture the original file's permission bits before overwriting.
+	origMode := os.FileMode(0o644)
+	if fi, sterr := os.Stat(mdPath); sterr == nil {
+		origMode = fi.Mode().Perm()
+	}
+
 	// Atomic write: temp file in the same directory, then rename.
 	tmp, terr := os.CreateTemp(dir, ".bake-tmp-*")
 	if terr != nil {
 		return res, fmt.Errorf("bake: create temp: %w", terr)
 	}
 	tmpPath := tmp.Name()
-	_, werr := tmp.WriteString(out.String())
+	_, werr := tmp.Write(outBytes)
 	cerr := tmp.Close()
 	if werr != nil || cerr != nil {
 		os.Remove(tmpPath)
@@ -143,6 +161,11 @@ func Bake(mdPath string, opts Options) (Result, error) {
 			return res, fmt.Errorf("bake: write temp: %w", werr)
 		}
 		return res, fmt.Errorf("bake: close temp: %w", cerr)
+	}
+	// Fix 2: restore the original mode before rename so the dest keeps its perms.
+	if cherr := os.Chmod(tmpPath, origMode); cherr != nil {
+		os.Remove(tmpPath)
+		return res, fmt.Errorf("bake: chmod temp: %w", cherr)
 	}
 	if rerr := os.Rename(tmpPath, mdPath); rerr != nil {
 		os.Remove(tmpPath)
@@ -157,12 +180,12 @@ func Bake(mdPath string, opts Options) (Result, error) {
 }
 
 // renderBlock dispatches to the correct render path based on lang.
-func renderBlock(lang, body string, infer bool, theme *svg.Theme) ([]byte, error) {
+func renderBlock(lang, body string, opts Options, theme *svg.Theme) ([]byte, error) {
 	switch lang {
 	case "mermaid":
-		return renderMermaidBody(body, infer, theme)
+		return renderMermaidBody(body, opts.Infer, theme)
 	case "sir", "sirena":
-		return renderSirenaBody(body, theme)
+		return renderSirenaBody(body, opts)
 	default:
 		return nil, fmt.Errorf("unknown language %q", lang)
 	}
@@ -195,60 +218,17 @@ func renderMermaidBody(body string, infer bool, theme *svg.Theme) ([]byte, error
 }
 
 // renderSirenaBody renders a sirena (sir/sirena) source body to SVG bytes via
-// fence.Render semantics, but inline (no fence package import to avoid cycle;
-// fence is already a wrapper around this exact sequence).
-func renderSirenaBody(body string, theme *svg.Theme) ([]byte, error) {
-	ws, err := sirena.NewFenceWorkspace([]byte(body), sirena.FenceOptions{})
+// the canonical fence.Render entrypoint. StrictBudget is false so bake
+// receives an SVG even when the diagram is over budget.
+func renderSirenaBody(body string, opts Options) ([]byte, error) {
+	res, err := fence.Render([]byte(body), fence.Options{Theme: opts.Theme})
 	if err != nil {
-		return nil, fmt.Errorf("sirena workspace: %w", err)
+		return nil, err
 	}
-
-	doc := ws.Files[0].Document
-	if doc == nil {
-		loaded, lerr := ws.LoadDocument(ws.Files[0])
-		if lerr != nil {
-			return nil, fmt.Errorf("sirena load document: %w", lerr)
-		}
-		doc = loaded
+	if len(res.SVG) == 0 {
+		return nil, fmt.Errorf("sirena fence produced no SVG (%d diagnostics)", len(res.Diagnostics))
 	}
-
-	// Build the view: first declared view, or all-elements synthesis.
-	var rv *sirena.ResolvedView
-	if len(doc.Views) > 0 {
-		rv, err = sirena.EvaluateView(ws, doc.Views[0])
-		if err != nil {
-			return nil, fmt.Errorf("sirena evaluate view: %w", err)
-		}
-	} else if docHasRenderableContent(doc) {
-		rv = sirena.AllElementsView(doc)
-	} else {
-		return nil, errors.New("sirena fence has no view and no renderable elements")
-	}
-
-	lr, _, rerr := sirena.Render(rv, sirena.RenderOptions{})
-	if rerr != nil {
-		return nil, fmt.Errorf("sirena render: %w", rerr)
-	}
-	if lr == nil {
-		return nil, errors.New("sirena render produced no layout")
-	}
-
-	out, serr := svg.Render(lr, theme)
-	if serr != nil {
-		return nil, fmt.Errorf("svg render: %w", serr)
-	}
-	return out, nil
-}
-
-// docHasRenderableContent reports whether the document has any elements,
-// boundaries, or edges worth rendering.
-func docHasRenderableContent(doc *sirena.Document) bool {
-	for _, sys := range doc.Systems {
-		if len(sys.Elements) > 0 || len(sys.Boundaries) > 0 || len(sys.Edges) > 0 {
-			return true
-		}
-	}
-	return false
+	return res.SVG, nil
 }
 
 // rewriteBlock builds the source-preserving baked block markup for one diagram.
