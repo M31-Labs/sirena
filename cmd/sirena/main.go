@@ -40,6 +40,8 @@ func main() {
 		exit = RunRender(args, os.Stdout, os.Stderr)
 	case "emit":
 		exit = RunEmit(args, os.Stdout, os.Stderr)
+	case "bake":
+		exit = RunBake(args, os.Stdout, os.Stderr)
 	case "new":
 		exit = RunNew(args, os.Stdout, os.Stderr)
 	case "-h", "--help", "help":
