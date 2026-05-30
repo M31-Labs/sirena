@@ -25,3 +25,6 @@ bin/
 
 # Font source for the glyph generator (output glyphs.go is committed)
 render/svg/font/generate/*.ttf
+
+# Eyeball SVG written by render_test.go for manual inspection — not tracked
+ingest/mermaid/testdata/_eyeball.svg

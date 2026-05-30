@@ -31,6 +31,18 @@ func Parse(src []byte, opts Options) (*sirena.Document, []sirena.Diagnostic, err
 	if err != nil {
 		return nil, preDiags, err
 	}
+	// Guard against pool.Parse returning a nil tree or nil root node (e.g. for
+	// completely empty input). Mirror the pattern in emit/goimport.go and
+	// parse.go: treat a nil root as NOT-A-GRAPH without dereferencing the node.
+	if tree == nil || tree.RootNode() == nil {
+		diag := sirena.Diagnostic{
+			Code:     "SIR-MERMAID-NOT-A-GRAPH",
+			Severity: sirena.SeverityError,
+			Message:  "Input is not a Mermaid flowchart (no diagram_flow node found)",
+			Range:    sirena.Range{},
+		}
+		return nil, append(preDiags, diag), notAGraphError
+	}
 	// smap maps clean-src byte offsets back to original-src offsets so every
 	// CST-derived diagnostic Range points at the user's actual source.
 	l := &lowerer{lang: lang, src: clean, smap: smap, opts: opts, diags: preDiags}

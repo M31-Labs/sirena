@@ -63,8 +63,8 @@ func TestCorpus_ParseAndRender(t *testing.T) {
 
 			// Fatal diagnostics are not allowed.
 			// SIR-MERMAID-PARSE must NEVER appear — the normalize pass now
-			// rewrites styling lines to Mermaid comments (%% …) so that the
-			// grammar never enters error-recovery regardless of STYLE-DROPPED.
+			// deletes styling lines so that the grammar never enters
+			// error-recovery regardless of STYLE-DROPPED.
 			for _, d := range diags {
 				switch d.Code {
 				case "SIR-MERMAID-NOT-A-GRAPH":
