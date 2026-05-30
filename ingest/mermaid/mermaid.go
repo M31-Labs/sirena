@@ -34,6 +34,9 @@ func Parse(src []byte, opts Options) (*sirena.Document, []sirena.Diagnostic, err
 	// smap maps clean-src byte offsets back to original-src offsets so every
 	// CST-derived diagnostic Range points at the user's actual source.
 	l := &lowerer{lang: lang, src: clean, smap: smap, opts: opts, diags: preDiags}
-	doc := l.lowerRoot(tree.RootNode()) // Phase B/C/D
+	doc := l.lowerRoot(tree.RootNode()) // Phase B/C/D/E
+	if opts.Infer && doc != nil {
+		applyInference(doc) // Phase F: opt-in promotion pass
+	}
 	return doc, l.diags, l.fatal
 }
