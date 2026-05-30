@@ -223,7 +223,205 @@ func TestLower_SubgraphToBoundary(t *testing.T) {
 	}
 }
 
+// TestLower_SubgraphUnlabeled covers D-bug: subgraph without brackets.
+// subgraph net → id="net", no label metadata, 2 children.
+func TestLower_SubgraphUnlabeled(t *testing.T) {
+	src := "flowchart TB\n  subgraph net\n    api[API] --> db[(DB)]\n  end\n"
+	doc, _, err := Parse([]byte(src), Options{})
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+	sys := doc.Systems[0]
+
+	if got := len(sys.Boundaries); got != 1 {
+		t.Fatalf("want 1 boundary, got %d", got)
+	}
+	b := sys.Boundaries[0]
+	if b.Name != "net" {
+		t.Errorf("boundary Name = %q, want %q", b.Name, "net")
+	}
+	if b.Kind != sirena.BoundaryKindGroup {
+		t.Errorf("boundary Kind = %v, want BoundaryKindGroup", b.Kind)
+	}
+	// No label metadata for unlabeled subgraph.
+	if _, ok := b.Metadata["label"]; ok {
+		t.Error("unlabeled boundary should have no \"label\" metadata key")
+	}
+	// 2 child Elements: api and db.
+	if got := len(b.Children); got != 2 {
+		t.Fatalf("want 2 boundary children, got %d", got)
+	}
+	var childNames []string
+	for _, c := range b.Children {
+		el, ok := c.(*sirena.Element)
+		if !ok {
+			t.Errorf("child type %T, want *sirena.Element", c)
+			continue
+		}
+		childNames = append(childNames, el.Name)
+	}
+	if !contains(childNames, "api") || !contains(childNames, "db") {
+		t.Errorf("boundary children = %v, want [api db]", childNames)
+	}
+}
+
+// TestLower_SiblingSubgraphs covers D: two top-level subgraphs → 2 boundaries,
+// elements routed to the correct boundary.
+func TestLower_SiblingSubgraphs(t *testing.T) {
+	src := "flowchart LR\n  subgraph frontend\n    ui[UI]\n  end\n  subgraph backend\n    api[API]\n  end\n  ui --> api\n"
+	doc, _, err := Parse([]byte(src), Options{})
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+	sys := doc.Systems[0]
+
+	if got := len(sys.Boundaries); got != 2 {
+		t.Fatalf("want 2 boundaries, got %d", got)
+	}
+	fe := findBoundary(sys.Boundaries, "frontend")
+	be := findBoundary(sys.Boundaries, "backend")
+	if fe == nil {
+		t.Fatal("boundary \"frontend\" not found")
+	}
+	if be == nil {
+		t.Fatal("boundary \"backend\" not found")
+	}
+
+	// frontend has child ui; backend has child api.
+	if got := len(fe.Children); got != 1 {
+		t.Fatalf("frontend: want 1 child, got %d", got)
+	}
+	if el, ok := fe.Children[0].(*sirena.Element); !ok || el.Name != "ui" {
+		t.Errorf("frontend child = %v, want Element{ui}", fe.Children[0])
+	}
+	if got := len(be.Children); got != 1 {
+		t.Fatalf("backend: want 1 child, got %d", got)
+	}
+	if el, ok := be.Children[0].(*sirena.Element); !ok || el.Name != "api" {
+		t.Errorf("backend child = %v, want Element{api}", be.Children[0])
+	}
+
+	// Edge ui→api in sys.Edges.
+	if findEdge(sys.Edges, "ui", "api") == nil {
+		t.Error("edge ui→api not found in sys.Edges")
+	}
+
+	// No top-level elements (both ui and api are in boundaries).
+	if got := len(sys.Elements); got != 0 {
+		t.Errorf("want 0 top-level elements, got %d", got)
+	}
+}
+
+// TestLower_NestedSubgraphs covers D: 2-level nesting.
+// outer has inner boundary as child; inner elements in inner.Children.
+func TestLower_NestedSubgraphs(t *testing.T) {
+	src := "flowchart TB\n  subgraph outer\n    subgraph inner\n      svc[Svc]\n    end\n  end\n"
+	doc, _, err := Parse([]byte(src), Options{})
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+	sys := doc.Systems[0]
+
+	if got := len(sys.Boundaries); got != 1 {
+		t.Fatalf("want 1 top-level boundary, got %d", got)
+	}
+	outerB := sys.Boundaries[0]
+	if outerB.Name != "outer" {
+		t.Errorf("outer boundary Name = %q, want %q", outerB.Name, "outer")
+	}
+	if got := len(outerB.Children); got != 1 {
+		t.Fatalf("outer: want 1 child (the inner boundary), got %d", got)
+	}
+	innerB, ok := outerB.Children[0].(*sirena.Boundary)
+	if !ok {
+		t.Fatalf("outer child type %T, want *sirena.Boundary", outerB.Children[0])
+	}
+	if innerB.Name != "inner" {
+		t.Errorf("inner boundary Name = %q, want %q", innerB.Name, "inner")
+	}
+	if got := len(innerB.Children); got != 1 {
+		t.Fatalf("inner: want 1 child element, got %d", got)
+	}
+	el, ok := innerB.Children[0].(*sirena.Element)
+	if !ok {
+		t.Fatalf("inner child type %T, want *sirena.Element", innerB.Children[0])
+	}
+	if el.Name != "svc" {
+		t.Errorf("inner child Name = %q, want %q", el.Name, "svc")
+	}
+}
+
+// TestLower_CrossReferencedElement covers D: element declared inside a subgraph,
+// referenced by a top-level edge. api stays in boundary.Children (not duplicated
+// into sys.Elements); edge is still emitted.
+func TestLower_CrossReferencedElement(t *testing.T) {
+	src := "flowchart TB\n  subgraph net\n    api[API]\n  end\n  client --> api\n"
+	doc, _, err := Parse([]byte(src), Options{})
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+	sys := doc.Systems[0]
+
+	// 1 boundary with api inside it.
+	if got := len(sys.Boundaries); got != 1 {
+		t.Fatalf("want 1 boundary, got %d", got)
+	}
+	b := sys.Boundaries[0]
+	if got := len(b.Children); got != 1 {
+		t.Fatalf("boundary: want 1 child, got %d", got)
+	}
+	el, ok := b.Children[0].(*sirena.Element)
+	if !ok || el.Name != "api" {
+		t.Errorf("boundary child = %v, want Element{api}", b.Children[0])
+	}
+
+	// api must NOT appear in top-level sys.Elements.
+	if findElement(sys.Elements, "api") != nil {
+		t.Error("api should not appear in sys.Elements (it lives in boundary)")
+	}
+
+	// client IS a top-level element.
+	if findElement(sys.Elements, "client") == nil {
+		t.Error("client not found in sys.Elements")
+	}
+
+	// Edge client→api in sys.Edges.
+	if findEdge(sys.Edges, "client", "api") == nil {
+		t.Error("edge client→api not found in sys.Edges")
+	}
+}
+
+// TestLower_EmptySubgraph covers D: empty subgraph → 1 boundary, 0 children, no crash.
+func TestLower_EmptySubgraph(t *testing.T) {
+	src := "flowchart TB\n  subgraph net\n  end\n"
+	doc, _, err := Parse([]byte(src), Options{})
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+	sys := doc.Systems[0]
+
+	if got := len(sys.Boundaries); got != 1 {
+		t.Fatalf("want 1 boundary, got %d", got)
+	}
+	b := sys.Boundaries[0]
+	if b.Name != "net" {
+		t.Errorf("boundary Name = %q, want %q", b.Name, "net")
+	}
+	if got := len(b.Children); got != 0 {
+		t.Errorf("want 0 children, got %d", got)
+	}
+}
+
 // ── helpers ──────────────────────────────────────────────────────────────────
+
+func findBoundary(bounds []*sirena.Boundary, name string) *sirena.Boundary {
+	for _, b := range bounds {
+		if b.Name == name {
+			return b
+		}
+	}
+	return nil
+}
 
 func contains(ss []string, s string) bool {
 	for _, v := range ss {

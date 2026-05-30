@@ -81,17 +81,21 @@ func (l *lowerer) lowerRoot(root *gt.Node) *sirena.Document {
 // Inner edges go to sys.Edges regardless of containment.
 // Nested subgraphs recurse and become child *sirena.Boundary entries.
 func (l *lowerer) lowerSubgraph(node *gt.Node, sys *sirena.SystemDecl) *sirena.Boundary {
-	// Extract boundary id.
+	// Extract boundary id and optional label.
+	// labeled:   subgraph id[Label]  → flow_vertex_id is the id; flow_vertex_text is the label
+	// unlabeled: subgraph id         → no flow_vertex_id; flow_vertex_text IS the id (no label)
 	idNode := namedChildOfType(node, l.lang, "flow_vertex_id")
-	if idNode == nil {
-		return nil
+	var id, label string
+	if idNode != nil {
+		id = string(l.src[idNode.StartByte():idNode.EndByte()])
+		if labelNode := namedChildOfType(node, l.lang, "flow_vertex_text"); labelNode != nil {
+			label = string(l.src[labelNode.StartByte():labelNode.EndByte()])
+		}
+	} else if txtNode := namedChildOfType(node, l.lang, "flow_vertex_text"); txtNode != nil {
+		id = string(l.src[txtNode.StartByte():txtNode.EndByte()])
 	}
-	id := string(l.src[idNode.StartByte():idNode.EndByte()])
-
-	// Extract optional label from flow_vertex_text.
-	label := ""
-	if labelNode := namedChildOfType(node, l.lang, "flow_vertex_text"); labelNode != nil {
-		label = string(l.src[labelNode.StartByte():labelNode.EndByte()])
+	if id == "" {
+		return nil
 	}
 
 	b := &sirena.Boundary{
