@@ -1,0 +1,46 @@
+{
+  "diagnostics": null,
+  "document": {
+    "Imports": null,
+    "Systems": [
+      {
+        "Elements": null,
+        "Boundaries": [
+          {
+            "Kind": 5,
+            "Name": "net",
+            "Children": [
+              {
+                "Kind": 1,
+                "Name": "api",
+                "Metadata": null,
+                "Override": null,
+                "Range": {
+                  "Start": 25,
+                  "End": 36
+                }
+              }
+            ],
+            "Metadata": null,
+            "Override": null,
+            "Range": {
+              "Start": 0,
+              "End": 38
+            }
+          }
+        ],
+        "Edges": null,
+        "Range": {
+          "Start": 0,
+          "End": 39
+        }
+      }
+    ],
+    "Views": null,
+    "Manifest": null,
+    "Range": {
+      "Start": 0,
+      "End": 39
+    }
+  }
+}

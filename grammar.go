@@ -30,7 +30,7 @@ import "github.com/odvcencio/gotreesitter/grammargen"
 //	list              → "[" value ("," value)* "]"
 //	boundary_decl     → "boundary" boundary_kind STRING override_annotation?
 //	                    metadata_block? boundary_block
-//	boundary_kind     → "trust" | "network" | "deployment" | "team"
+//	boundary_kind     → "trust" | "network" | "deployment" | "team" | "group"
 //	boundary_block    → "{" (element_decl | boundary_decl | edge_decl)* "}"
 //	edge_decl         → (IDENT | qualified_ident) arrow (IDENT | qualified_ident)
 //	                    override_annotation? (":" edge_kind STRING?)? metadata_block?
@@ -165,6 +165,7 @@ func SirenaGrammar() *grammargen.Grammar {
 		grammargen.Str("network"),
 		grammargen.Str("deployment"),
 		grammargen.Str("team"),
+		grammargen.Str("group"),
 	))
 
 	// boundary_block → "{" (element_decl | boundary_decl | edge_decl)* "}"
