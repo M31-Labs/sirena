@@ -1,0 +1,47 @@
+# EXAMPLE / TEMPLATE — not a CI gate for the sirena repo itself.
+#
+# This workflow shows how a *consumer* repo can use the M31-Labs/sirena action
+# to bake diagram fences on every push and commit the generated SVGs back.
+#
+# Copy this file into your repo's .github/workflows/ and adjust `paths` to
+# match your documentation layout.
+#
+# Trigger: workflow_dispatch only — prevents accidental auto-runs in this repo.
+on:
+  workflow_dispatch:
+
+name: bake-docs-example
+
+jobs:
+  bake:
+    name: Bake diagram fences
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # required for git push
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Fetch full history so git push can fast-forward
+          fetch-depth: 0
+
+      - name: Bake diagrams
+        uses: M31-Labs/sirena@v1
+        with:
+          paths: "docs/**/*.md README.md"
+          theme: earth-default   # optional — this is the default
+          # infer: "true"        # uncomment to promote Mermaid shapes to Sirena kinds
+
+      - name: Commit generated SVGs
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          # Only commit when there are actual changes
+          if git diff --cached --quiet; then
+            echo "No diagram changes — nothing to commit."
+          else
+            git commit -m "chore(docs): bake diagram SVGs [skip ci]"
+            git push
+          fi

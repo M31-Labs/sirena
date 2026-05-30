@@ -1,0 +1,36 @@
+name: "Sirena Bake"
+description: >
+  Render Mermaid and Sirena diagram fences in Markdown files to committed SVGs.
+  Rewrites each fence to a source-preserving block (inline SVG reference + collapsed
+  source details). Does NOT commit — leave that to the consumer workflow for flexibility.
+
+inputs:
+  paths:
+    description: >
+      Space- or newline-separated globs of Markdown files to bake.
+      Example: "docs/**/*.md README.md"
+    required: true
+  theme:
+    description: >
+      Sirena theme name. Defaults to "earth-default" (the built-in earth-tone palette).
+    required: false
+    default: "earth-default"
+  infer:
+    description: >
+      When "true", promote Mermaid shapes and labels to typed Sirena kinds.
+    required: false
+    default: "false"
+  working-directory:
+    description: >
+      Directory to run sirena bake from. Defaults to the repo root.
+    required: false
+    default: "."
+
+runs:
+  using: docker
+  image: Dockerfile
+  args:
+    - ${{ inputs.paths }}
+    - ${{ inputs.theme }}
+    - ${{ inputs.infer }}
+    - ${{ inputs.working-directory }}
