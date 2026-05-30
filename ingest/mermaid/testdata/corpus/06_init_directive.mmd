@@ -1,0 +1,11 @@
+%%{init: {"theme": "default", "flowchart": {"curve": "linear"}}}%%
+flowchart LR
+  Ingress[Ingress]
+  AppA[App A]
+  AppB[App B]
+  Shared[(Shared DB)]
+
+  Ingress --> AppA
+  Ingress --> AppB
+  AppA -->|read| Shared
+  AppB -->|write| Shared

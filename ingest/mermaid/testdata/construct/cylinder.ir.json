@@ -1,0 +1,10 @@
+{
+  "elements": [
+    {
+      "name": "A",
+      "kind": "node",
+      "label": "Cylinder Node",
+      "shape": "cylinder"
+    }
+  ]
+}

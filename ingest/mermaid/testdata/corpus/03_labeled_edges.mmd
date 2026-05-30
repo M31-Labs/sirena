@@ -1,0 +1,14 @@
+flowchart LR
+  Browser([Browser])
+  Gateway[API Gateway]
+  AuthSvc[Auth Service]
+  OrderSvc[Order Service]
+  PaySvc[Payment Service]
+  DB[(Orders DB)]
+
+  Browser -->|HTTP POST /login| Gateway
+  Gateway -->|validate token| AuthSvc
+  Gateway -->|create order| OrderSvc
+  OrderSvc -->|charge| PaySvc
+  OrderSvc -->|persist| DB
+  PaySvc -->|confirm| OrderSvc

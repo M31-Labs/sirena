@@ -1,0 +1,10 @@
+{
+  "elements": [
+    {
+      "name": "A",
+      "kind": "node",
+      "label": "Rectangle Node",
+      "shape": "rect"
+    }
+  ]
+}

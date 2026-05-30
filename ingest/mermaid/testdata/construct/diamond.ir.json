@@ -1,0 +1,10 @@
+{
+  "elements": [
+    {
+      "name": "A",
+      "kind": "node",
+      "label": "Diamond Node",
+      "shape": "diamond"
+    }
+  ]
+}

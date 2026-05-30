@@ -1,0 +1,40 @@
+{
+  "edges": [
+    {
+      "from": "B",
+      "to": "C",
+      "kind": "flow"
+    }
+  ],
+  "boundaries": [
+    {
+      "name": "outer",
+      "kind": "group",
+      "label": "Outer Group",
+      "children": [
+        {
+          "type": "boundary",
+          "name": "inner",
+          "kind": "group",
+          "label": "Inner Group",
+          "children": [
+            {
+              "type": "element",
+              "name": "C",
+              "kind": "node",
+              "label": "Deep Node",
+              "shape": "rect"
+            }
+          ]
+        },
+        {
+          "type": "element",
+          "name": "B",
+          "kind": "node",
+          "label": "Outer Node",
+          "shape": "rect"
+        }
+      ]
+    }
+  ]
+}

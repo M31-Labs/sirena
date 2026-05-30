@@ -1,0 +1,16 @@
+flowchart TD
+  Start([Start])
+  Decision{Is valid?}
+  Process[Process Request]
+  Cache{{Check Cache}}
+  Store[(Data Store)]
+  Done([Done])
+  Error[Return Error]
+
+  Start --> Cache
+  Cache -->|hit| Done
+  Cache -->|miss| Decision
+  Decision -->|yes| Process
+  Decision -->|no| Error
+  Process --> Store
+  Store --> Done

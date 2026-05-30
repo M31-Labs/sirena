@@ -1,0 +1,20 @@
+{
+  "elements": [
+    {
+      "name": "A",
+      "kind": "node"
+    },
+    {
+      "name": "B",
+      "kind": "node"
+    }
+  ],
+  "edges": [
+    {
+      "from": "A",
+      "to": "B",
+      "kind": "flow",
+      "label": "sends data"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+flowchart TD
+  Client[Client]
+
+  subgraph cloud[Cloud Platform]
+    subgraph frontend[Frontend Tier]
+      CDN[CDN]
+      LB[Load Balancer]
+    end
+
+    subgraph backend[Backend Tier]
+      API[API Server]
+      Worker[Background Worker]
+    end
+
+    DB[(Postgres)]
+    Queue{{Message Queue}}
+  end
+
+  Client --> CDN
+  CDN --> LB
+  LB --> API
+  API -->|enqueue jobs| Queue
+  Queue --> Worker
+  API --> DB
+  Worker --> DB

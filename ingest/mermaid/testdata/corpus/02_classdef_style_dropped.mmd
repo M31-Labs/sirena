@@ -1,0 +1,12 @@
+flowchart LR
+  A[Service]
+  B[(Database)]
+  C[Cache]
+
+  classDef svcStyle fill:#f9f,stroke:#333
+  classDef dbStyle fill:#bbf
+
+  style A fill:#f9f
+
+  A -->|query| B
+  A --> C

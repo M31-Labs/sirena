@@ -1,0 +1,32 @@
+{
+  "edges": [
+    {
+      "from": "A",
+      "to": "B",
+      "kind": "flow"
+    }
+  ],
+  "boundaries": [
+    {
+      "name": "grp",
+      "kind": "group",
+      "label": "My Group",
+      "children": [
+        {
+          "type": "element",
+          "name": "A",
+          "kind": "node",
+          "label": "Node A",
+          "shape": "rect"
+        },
+        {
+          "type": "element",
+          "name": "B",
+          "kind": "node",
+          "label": "Node B",
+          "shape": "rect"
+        }
+      ]
+    }
+  ]
+}

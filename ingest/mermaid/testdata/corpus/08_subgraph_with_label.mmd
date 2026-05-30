@@ -1,0 +1,21 @@
+flowchart TD
+  UI[Web UI]
+
+  subgraph api[Public API Layer]
+    REST[REST Handler]
+    GQL[GraphQL Handler]
+  end
+
+  subgraph data[Data Layer]
+    Cache{{Redis Cache}}
+    Primary[(Primary DB)]
+    Replica[(Read Replica)]
+  end
+
+  UI --> REST
+  UI --> GQL
+  REST --> Cache
+  REST --> Primary
+  GQL --> Cache
+  GQL --> Replica
+  Primary --> Replica
