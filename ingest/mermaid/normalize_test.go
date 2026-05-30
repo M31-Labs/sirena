@@ -1,6 +1,7 @@
 package mermaid
 
 import (
+	"bytes"
 	"testing"
 
 	"m31labs.dev/sirena"
@@ -59,12 +60,16 @@ func TestNormalize_GraphKeywordAndSemicolon(t *testing.T) {
 	}
 }
 
-// TestNormalize_ClassDefStripped verifies that a classDef line is blanked
-// with a SIR-MERMAID-STYLE-DROPPED warning, and that no phantom element
-// appears in the parsed document.
+// TestNormalize_ClassDefStripped verifies that a classDef line is deleted
+// from the clean buffer with a SIR-MERMAID-STYLE-DROPPED warning, the
+// srcMap correctly maps the post-deletion clean buffer offsets back to the
+// original source, and no phantom element appears in the parsed document.
 func TestNormalize_ClassDefStripped(t *testing.T) {
+	// src: "flowchart LR\n A-->B\n classDef x fill:#f9f\n"
+	//       offset:         0..12  13..19   20..41
+	// "flowchart LR\n" = 13 bytes, " A-->B\n" = 7 bytes, " classDef x fill:#f9f\n" = 22 bytes
 	src := []byte("flowchart LR\n A-->B\n classDef x fill:#f9f\n")
-	clean, diags, _ := normalize(src)
+	clean, diags, smap := normalize(src)
 
 	// Expect exactly one SIR-MERMAID-STYLE-DROPPED warning.
 	styleDrops := 0
@@ -86,19 +91,28 @@ func TestNormalize_ClassDefStripped(t *testing.T) {
 		t.Errorf("want 1 SIR-MERMAID-STYLE-DROPPED, got %d", styleDrops)
 	}
 
-	// The classDef line must be blanked (all spaces) in clean output.
-	// Line starts at offset 20; content is " classDef x fill:#f9f" (21 bytes);
-	// the '\n' at offset 41 is preserved.
-	const classDefLineStart = 20
-	const classDefContent = " classDef x fill:#f9f"
-	for i := classDefLineStart; i < classDefLineStart+len(classDefContent); i++ {
-		if clean[i] != ' ' {
-			t.Errorf("clean[%d] = %q, want space (classDef line not blanked)", i, clean[i])
-		}
+	// The classDef line is deleted: clean must be shorter than src.
+	// src = 42 bytes, classDef line = " classDef x fill:#f9f\n" = 22 bytes.
+	// clean must be 42 - 22 = 20 bytes.
+	wantCleanLen := len(src) - len(" classDef x fill:#f9f\n")
+	if len(clean) != wantCleanLen {
+		t.Errorf("clean length = %d, want %d (deletion should have shortened it)", len(clean), wantCleanLen)
 	}
-	// The newline must be preserved.
-	if clean[classDefLineStart+len(classDefContent)] != '\n' {
-		t.Errorf("newline after classDef line was clobbered")
+
+	// The clean buffer must not contain "classDef".
+	if bytes.Contains(clean, []byte("classDef")) {
+		t.Error("clean buffer contains 'classDef' — line was not deleted")
+	}
+
+	// The srcMap must correctly map clean offsets to original offsets.
+	// clean = "flowchart LR\n A-->B\n" (20 bytes).
+	// Offset 19 in clean is the '\n' at end of " A-->B\n" (originally also offset 19).
+	// No edits affect bytes before the deleted line (offset 0..19), so identity.
+	if got := smap.orig(0); got != 0 {
+		t.Errorf("smap.orig(0) = %d, want 0", got)
+	}
+	if got := smap.orig(13); got != 13 {
+		t.Errorf("smap.orig(13) = %d, want 13", got)
 	}
 
 	// Parse the original source and confirm no phantom "classDef" element.
@@ -113,6 +127,103 @@ func TestNormalize_ClassDefStripped(t *testing.T) {
 		if el.Name == "classDef" || el.Name == "x" {
 			t.Errorf("phantom element %q from classDef line should not appear", el.Name)
 		}
+	}
+}
+
+// TestNormalize_ClassDefAndClassNoContentLoss verifies the critical case:
+// classDef + class application statements interspersed with edges must NOT
+// cause content loss. All three edges must survive, no SIR-MERMAID-PARSE
+// diagnostic must be emitted, and no phantom elements from styling keywords
+// must appear.
+func TestNormalize_ClassDefAndClassNoContentLoss(t *testing.T) {
+	src := []byte("flowchart LR\n  A --> B\n  classDef foo fill:#f9f\n  C --> D\n  class A foo\n  E --> F\n")
+
+	doc, diags, err := Parse(src, Options{})
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+	if doc == nil {
+		t.Fatal("Parse returned nil doc")
+	}
+	if len(doc.Systems) == 0 {
+		t.Fatal("want at least 1 system")
+	}
+
+	// No SIR-MERMAID-PARSE diagnostic allowed.
+	for _, d := range diags {
+		if d.Code == "SIR-MERMAID-PARSE" {
+			t.Errorf("SIR-MERMAID-PARSE diagnostic present (content loss): %s", d.Message)
+		}
+	}
+
+	// Exactly 2 STYLE-DROPPED diagnostics: one for classDef, one for class.
+	styleDropped := 0
+	for _, d := range diags {
+		if d.Code == "SIR-MERMAID-STYLE-DROPPED" {
+			styleDropped++
+		}
+	}
+	if styleDropped != 2 {
+		t.Errorf("want 2 SIR-MERMAID-STYLE-DROPPED (classDef + class), got %d", styleDropped)
+	}
+
+	// All three edges must survive.
+	edges := doc.Systems[0].Edges
+	if len(edges) != 3 {
+		t.Errorf("want 3 edges (A→B, C→D, E→F), got %d", len(edges))
+	}
+
+	// No phantom elements from styling keywords.
+	for _, el := range doc.Systems[0].Elements {
+		switch el.Name {
+		case "classDef", "class", "foo":
+			t.Errorf("phantom element %q from styling line should not appear", el.Name)
+		}
+	}
+}
+
+// TestNormalize_ClassVsClassDef verifies that "classDef" still matches its own
+// rule and that "class" as the first token of a line matches the class-
+// application rule (whole-word, not prefix of classDef).
+func TestNormalize_ClassVsClassDef(t *testing.T) {
+	src := []byte("flowchart LR\n  A --> B\n  classDef myStyle fill:#f9f\n  class A myStyle\n  B --> C\n")
+
+	_, diags, _ := normalize(src)
+
+	var classDefs, classApps int
+	for _, d := range diags {
+		if d.Code != "SIR-MERMAID-STYLE-DROPPED" {
+			continue
+		}
+		switch d.Message {
+		case "Mermaid styling directive dropped (no sirena equivalent): classDef":
+			classDefs++
+		case "Mermaid styling directive dropped (no sirena equivalent): class":
+			classApps++
+		}
+	}
+	if classDefs != 1 {
+		t.Errorf("want 1 STYLE-DROPPED for classDef, got %d", classDefs)
+	}
+	if classApps != 1 {
+		t.Errorf("want 1 STYLE-DROPPED for class application, got %d", classApps)
+	}
+
+	// Parse — no PARSE diagnostic, both edges survive.
+	doc, parseDiags, err := Parse(src, Options{})
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+	for _, d := range parseDiags {
+		if d.Code == "SIR-MERMAID-PARSE" {
+			t.Errorf("SIR-MERMAID-PARSE present: %s", d.Message)
+		}
+	}
+	if doc == nil || len(doc.Systems) == 0 {
+		t.Fatal("nil doc or no systems")
+	}
+	if got := len(doc.Systems[0].Edges); got != 2 {
+		t.Errorf("want 2 edges (A→B, B→C), got %d", got)
 	}
 }
 

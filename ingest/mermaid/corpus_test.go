@@ -12,9 +12,27 @@ import (
 	"m31labs.dev/sirena/render/svg"
 )
 
+// corpusExpectations captures per-file edge/element expectations for corpus
+// files that have known structure. The map key is the filename base.
+// minEdges: the minimum number of edges the parsed doc must contain.
+// minElems: the minimum number of elements the parsed doc must contain.
+type corpusExpectation struct {
+	minEdges int
+	minElems int
+}
+
+// corpusExpected lists files with structural expectations beyond "≥1 element".
+// Files not listed here only need ≥1 element and no fatal diagnostics.
+var corpusExpected = map[string]corpusExpectation{
+	// Two edges: "A -->|query| B" and "A --> C", after classDef/style stripping.
+	"02_classdef_style_dropped.mmd": {minEdges: 2, minElems: 3},
+}
+
 // TestCorpus_ParseAndRender loads every *.mmd file under testdata/corpus/,
-// asserts it parses without fatal diagnostics (STYLE-DROPPED is OK), produces
-// ≥1 element, and renders end-to-end to valid SVG.
+// asserts it parses without fatal diagnostics (STYLE-DROPPED is OK and
+// SIR-MERMAID-PARSE must NOT appear — even alongside STYLE-DROPPED), produces
+// ≥1 element, and renders end-to-end to valid SVG. Files in corpusExpected
+// must also satisfy their minimum edge counts.
 func TestCorpus_ParseAndRender(t *testing.T) {
 	files, err := filepath.Glob(filepath.Join("testdata", "corpus", "*.mmd"))
 	if err != nil {
@@ -43,26 +61,16 @@ func TestCorpus_ParseAndRender(t *testing.T) {
 				t.Fatalf("Parse fatal error: %v", err)
 			}
 
-			// Fatal diagnostics are not allowed. STYLE-DROPPED is expected and fine.
-			// SIR-MERMAID-PARSE is also allowed when STYLE-DROPPED is present:
-			// blanking styling directive lines to whitespace is a known side-effect
-			// of the normalize pass that triggers grammar error-recovery, but the
-			// diagram still parses and produces a valid Document.
-			hasStyleDropped := false
-			for _, d := range diags {
-				if d.Code == "SIR-MERMAID-STYLE-DROPPED" {
-					hasStyleDropped = true
-					break
-				}
-			}
+			// Fatal diagnostics are not allowed.
+			// SIR-MERMAID-PARSE must NEVER appear — the normalize pass now
+			// rewrites styling lines to Mermaid comments (%% …) so that the
+			// grammar never enters error-recovery regardless of STYLE-DROPPED.
 			for _, d := range diags {
 				switch d.Code {
 				case "SIR-MERMAID-NOT-A-GRAPH":
 					t.Errorf("fatal diagnostic %s: %s", d.Code, d.Message)
 				case "SIR-MERMAID-PARSE":
-					if !hasStyleDropped {
-						t.Errorf("SIR-MERMAID-PARSE without any STYLE-DROPPED: %s", d.Message)
-					}
+					t.Errorf("SIR-MERMAID-PARSE diagnostic present (content loss bug): %s", d.Message)
 				}
 			}
 
@@ -77,6 +85,20 @@ func TestCorpus_ParseAndRender(t *testing.T) {
 			}
 			if elemCount == 0 {
 				t.Error("doc has 0 elements")
+			}
+
+			// Per-file structural assertions.
+			if exp, ok := corpusExpected[name]; ok {
+				if elemCount < exp.minElems {
+					t.Errorf("want ≥%d elements, got %d", exp.minElems, elemCount)
+				}
+				edgeCount := 0
+				for _, sys := range doc.Systems {
+					edgeCount += len(sys.Edges)
+				}
+				if edgeCount < exp.minEdges {
+					t.Errorf("want ≥%d edges, got %d (content-loss regression)", exp.minEdges, edgeCount)
+				}
 			}
 
 			// Full render chain.

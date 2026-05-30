@@ -2,46 +2,93 @@ package mermaid
 
 import (
 	"bytes"
+	"sort"
 
 	"m31labs.dev/sirena"
 )
 
-// srcMap records the single byte-offset shift introduced by rewriting the
-// leading "graph" keyword to "flowchart" (+4 bytes). All other normalize
-// edits are length-preserving, so the smap is identity for clean offsets
-// below the shift point.
+// srcEdit records a single contiguous deletion from the pre-deletion (keyword-
+// rewritten) buffer. cleanOff is the offset in the final clean buffer where
+// the run of deleted bytes starts; deletedBytes is how many bytes were removed
+// from the keyword-rewritten buffer at that point.
+type srcEdit struct {
+	// preOff is the byte offset in the pre-deletion (keyword-rewritten) buffer
+	// of the start of the deletion.
+	preOff int
+	// deletedBytes is how many consecutive bytes were removed.
+	deletedBytes int
+}
+
+// srcMap maps final-clean buffer byte offsets back to original-source byte
+// offsets. It handles two transforms applied in sequence:
+//
+//  1. rewriteGraphKeyword: adds shiftDelta bytes at shiftAt in the clean buffer
+//     (the keyword rewrite is an expansion, not a deletion).
+//  2. stripAndNeutralize: removes styling lines (deletions), tracked in edits.
+//
+// To map a clean offset back to original:
+//
+//	a. Undo deletions: walk edits (sorted by preOff) to recover the
+//	   pre-deletion (keyword-rewritten) offset.
+//	b. Undo keyword shift: subtract shiftDelta if offset >= shiftAt.
 type srcMap struct {
-	// shiftAt is the clean-source byte offset of the end of the keyword
-	// rewrite. Offsets < shiftAt are identity; offsets >= shiftAt subtract
-	// shiftDelta to recover the original offset.
-	shiftAt    int
-	shiftDelta int // how many bytes were added (4 for graph→flowchart)
+	// Keyword rewrite: "graph" → "flowchart" (+4 bytes at shiftAt).
+	shiftAt    int // end of "flowchart" in the keyword-rewritten buffer
+	shiftDelta int // bytes added (4 for graph→flowchart)
+
+	// edits is the ordered list of deletions in the keyword-rewritten buffer.
+	// Sorted by preOff ascending.
+	edits []srcEdit
 }
 
 // orig maps a clean-source byte offset back to the original-source offset.
 func (m srcMap) orig(cleanOffset int) int {
-	if m.shiftDelta != 0 && cleanOffset >= m.shiftAt {
-		return cleanOffset - m.shiftDelta
+	// Step 1: undo deletions to get the keyword-rewritten offset.
+	// Each edit removes deletedBytes bytes at preOff in the keyword-rewritten
+	// buffer. Bytes before preOff are unchanged; bytes at or after preOff in
+	// the final buffer are shifted forward by deletedBytes.
+	//
+	// We walk edits in order: for each edit, if the clean offset is past the
+	// point where that edit was applied (in the pre-deletion buffer), we add
+	// the deleted bytes back.
+	preOffset := cleanOffset
+	for _, e := range m.edits {
+		// e.preOff is the position in the pre-deletion buffer where bytes were
+		// removed. In the final (post-deletion) buffer, all bytes that were
+		// originally before e.preOff are still before that point; bytes after
+		// the deletion are shifted back by deletedBytes. So if preOffset (after
+		// accounting for previous edits) >= e.preOff, add e.deletedBytes.
+		if preOffset >= e.preOff {
+			preOffset += e.deletedBytes
+		}
 	}
-	return cleanOffset
+
+	// Step 2: undo keyword shift.
+	if m.shiftDelta != 0 && preOffset >= m.shiftAt {
+		return preOffset - m.shiftDelta
+	}
+	return preOffset
 }
 
-// normalize performs three length-preserving (or offset-recorded) edits on
-// the raw Mermaid source before it is handed to the grammar parser:
+// normalize performs three edits on the raw Mermaid source before it is
+// handed to the grammar parser:
 //
 //  1. Rewrites a leading "graph" keyword to "flowchart" (+4 bytes; recorded
 //     in the returned srcMap so CST ranges still map to the original source).
-//  2. Replaces statement-position semicolons with spaces (length-preserving).
+//  2. Strips whole lines whose statement keyword is classDef, style, linkStyle,
+//     click, or class (the application statement). Styling lines are DELETED
+//     from the clean buffer (not blanked), eliminating GLR error-recovery that
+//     would otherwise drop subsequent diagram_flow statements. The deleted byte
+//     ranges are recorded in the srcMap so all remaining CST offsets still map
+//     correctly to the original source. Each stripped line emits one
+//     SIR-MERMAID-STYLE-DROPPED warning with a Range pointing at the
+//     original-source line span (inclusive of the newline).
+//  3. Replaces statement-position semicolons with spaces (length-preserving).
 //     Semicolons inside "quoted strings" or [label]/(label) brackets are left
 //     untouched.
-//  3. Blanks out whole lines whose statement keyword is classDef, style,
-//     linkStyle, or click (length-preserving: spaces replace the line content
-//     but the newline is kept). Each stripped line emits one
-//     SIR-MERMAID-STYLE-DROPPED warning with a Range pointing at the
-//     original-source line span.
 func normalize(src []byte) (clean []byte, preDiags []sirena.Diagnostic, smap srcMap) {
 	clean, smap = rewriteGraphKeyword(src)
-	clean, preDiags = stripAndNeutralize(clean, preDiags, smap)
+	clean, preDiags, smap = stripAndNeutralize(clean, preDiags, smap)
 	return clean, preDiags, smap
 }
 
@@ -103,31 +150,50 @@ func rewriteGraphKeyword(src []byte) ([]byte, srcMap) {
 }
 
 // stylingKeywords lists the Mermaid statement keywords that have no grammar
-// production and must be stripped before parsing.
+// production and must be stripped before parsing. Order matters: "classDef"
+// must appear before "class" so that the whole-word check for "class" does
+// not need to special-case the "classDef" prefix — the loop breaks on first
+// match.
 var stylingKeywords = [][]byte{
 	[]byte("classDef"),
 	[]byte("style"),
 	[]byte("linkStyle"),
 	[]byte("click"),
+	[]byte("class"),
 }
 
-// stripAndNeutralize scans the (possibly already-rewritten) source
+// stripAndNeutralize scans the (possibly already keyword-rewritten) source
 // line-by-line to:
-//   - blank styling lines (classDef/style/linkStyle/click at statement start)
-//   - replace statement-position semicolons with spaces
-func stripAndNeutralize(src []byte, diags []sirena.Diagnostic, smap srcMap) ([]byte, []sirena.Diagnostic) {
-	out := make([]byte, len(src))
-	copy(out, src)
+//   - delete styling lines (classDef/style/linkStyle/click/class at statement
+//     start) from the clean buffer, recording deletions in smap.edits so that
+//     remaining CST byte offsets can be mapped back to the original source.
+//   - replace statement-position semicolons with spaces (length-preserving).
+//
+// Deletions include the trailing newline, so the clean buffer has fewer bytes
+// than the keyword-rewritten buffer. The smap is updated in place.
+func stripAndNeutralize(src []byte, diags []sirena.Diagnostic, smap srcMap) ([]byte, []sirena.Diagnostic, srcMap) {
+	// out is built by accumulating kept segments of src.
+	out := make([]byte, 0, len(src))
 
-	lineStart := 0
-	for lineStart < len(out) {
-		// Find end of line.
-		lineEnd := lineStart
-		for lineEnd < len(out) && out[lineEnd] != '\n' {
+	// prePos tracks our position in src (the keyword-rewritten buffer).
+	// cleanPos tracks the corresponding position in out (post-deletion buffer).
+	prePos := 0
+
+	for prePos < len(src) {
+		// Find end of line in src.
+		lineStart := prePos
+		lineEnd := prePos
+		for lineEnd < len(src) && src[lineEnd] != '\n' {
 			lineEnd++
 		}
-		// lineEnd points at '\n' or len(out).
-		line := out[lineStart:lineEnd]
+		// lineEnd points at '\n' or len(src).
+		// lineEndIncl is one past the newline (or len(src) if no trailing newline).
+		lineEndIncl := lineEnd
+		if lineEnd < len(src) {
+			lineEndIncl = lineEnd + 1 // include the '\n'
+		}
+
+		line := src[lineStart:lineEnd]
 
 		// Skip leading whitespace to find the statement keyword position.
 		kwStart := 0
@@ -147,7 +213,11 @@ func stripAndNeutralize(src []byte, diags []sirena.Diagnostic, smap srcMap) ([]b
 			if after < len(trimmed) && trimmed[after] != ' ' && trimmed[after] != '\t' {
 				continue
 			}
-			// Blank out the line content (preserve the '\n').
+			// Emit the STYLE-DROPPED diagnostic using the ORIGINAL source offsets.
+			// smap.orig maps keyword-rewritten offsets back to original offsets.
+			// At this point smap only has the keyword-shift; deletions haven't been
+			// recorded yet, so smap.orig gives correct keyword-rewritten→original
+			// offsets for this line (it's still in the keyword-rewritten buffer).
 			origStart := smap.orig(lineStart)
 			origEnd := smap.orig(lineEnd)
 			diags = append(diags, sirena.Diagnostic{
@@ -156,21 +226,39 @@ func stripAndNeutralize(src []byte, diags []sirena.Diagnostic, smap srcMap) ([]b
 				Message:  "Mermaid styling directive dropped (no sirena equivalent): " + string(trimmed[:len(kw)]),
 				Range:    sirena.Range{Start: origStart, End: origEnd},
 			})
-			for j := lineStart; j < lineEnd; j++ {
-				out[j] = ' '
-			}
+			// Record the deletion in smap. preOff is where these bytes are in
+			// the keyword-rewritten buffer. deletedBytes is the full line
+			// including the newline (lineEndIncl - lineStart bytes).
+			// We record the edit at the clean buffer position where the deletion
+			// would appear, i.e., len(out) (the number of kept bytes so far).
+			smap.edits = append(smap.edits, srcEdit{
+				preOff:       lineStart,
+				deletedBytes: lineEndIncl - lineStart,
+			})
+			// Do NOT append this line to out — it is deleted.
 			stripped = true
 			break
 		}
 
-		// If not stripped, neutralize statement-position semicolons.
 		if !stripped {
-			neutralizeSemicolons(out, lineStart, lineEnd)
+			// Append this line to out (with its newline), then neutralize
+			// semicolons in the appended segment.
+			segStart := len(out)
+			out = append(out, src[lineStart:lineEndIncl]...)
+			segEnd := segStart + (lineEnd - lineStart)
+			neutralizeSemicolons(out, segStart, segEnd)
 		}
 
-		lineStart = lineEnd + 1 // +1 to skip '\n'; safe even if lineEnd==len(out)
+		prePos = lineEndIncl
 	}
-	return out, diags
+
+	// Ensure edits are sorted by preOff (they should already be in order since
+	// we process lines top-to-bottom, but sort for safety).
+	sort.Slice(smap.edits, func(i, j int) bool {
+		return smap.edits[i].preOff < smap.edits[j].preOff
+	})
+
+	return out, diags, smap
 }
 
 // neutralizeSemicolons replaces statement-position ';' characters in the
