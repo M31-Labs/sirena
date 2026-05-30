@@ -5,6 +5,15 @@
 // Each subcommand is a pure (args, stdout, stderr) -> int call so the
 // tests can exercise them with bytes.Buffer fixtures without spawning
 // processes.
+//
+// Build tags (lean binary):
+//
+//	go build -tags "grammar_subset grammar_subset_go grammar_subset_mermaid" ./cmd/sirena
+//
+// Embeds only the Go and Mermaid grammar blobs instead of all 200+ grammars.
+// Measured savings: 32.4 MB → 29.3 MB (~3.1 MB, ~10%). All tests pass under
+// these tags. The default untagged build still links all grammars (required for
+// gotreesitter tools such as gts that need the full registry).
 package main
 
 import (
