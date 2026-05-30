@@ -281,10 +281,3 @@ func TestNormalize_Negatives(t *testing.T) {
 		t.Errorf("classDef in label: line should be untouched, got %q", string(cleanCDL[13:13+len(lineContent)]))
 	}
 }
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}

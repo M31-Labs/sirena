@@ -107,23 +107,13 @@ func rewriteGraphKeyword(src []byte) ([]byte, srcMap) {
 		for i < n && (src[i] == ' ' || src[i] == '\t') {
 			i++
 		}
-		// Skip %% comment lines.
+		// Skip %% comment lines and %%{init:…}%% directives (both start with "%%").
 		if i+1 < n && src[i] == '%' && src[i+1] == '%' {
 			for i < n && src[i] != '\n' {
 				i++
 			}
 			if i < n {
 				i++ // consume \n
-			}
-			continue
-		}
-		// Skip %{...}% init directives (%%{init:...}%%).
-		if i+2 < n && src[i] == '%' && src[i+1] == '%' && src[i+2] == '{' {
-			for i < n && src[i] != '\n' {
-				i++
-			}
-			if i < n {
-				i++
 			}
 			continue
 		}

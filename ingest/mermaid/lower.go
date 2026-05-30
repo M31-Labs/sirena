@@ -172,13 +172,6 @@ func (l *lowerer) lowerStmt(stmt *gt.Node, sys *sirena.SystemDecl) {
 		switch childType {
 		case "flow_node":
 			id := l.registerNode(child)
-			if prevID != "" {
-				// We just consumed a link before this node; the actual link node
-				// was already noted — we handle it below in the link case.
-				// This branch handles the trailing node after a link; the edge
-				// is emitted in the link case below once we know the To-id.
-				// So here we just update prevID.
-			}
 			prevID = id
 
 		case "flow_link_simplelink", "flow_link_arrowtext":

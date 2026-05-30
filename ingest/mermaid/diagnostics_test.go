@@ -1,7 +1,6 @@
 package mermaid
 
 import (
-	"strings"
 	"testing"
 
 	"m31labs.dev/sirena"
@@ -109,7 +108,7 @@ func TestDiag_Unsupported(t *testing.T) {
 // findDiagByCode returns the first Diagnostic whose Code equals code, or nil.
 func findDiag(diags []sirena.Diagnostic, code string) *sirena.Diagnostic {
 	for i := range diags {
-		if strings.EqualFold(diags[i].Code, code) || diags[i].Code == code {
+		if diags[i].Code == code {
 			return &diags[i]
 		}
 	}
