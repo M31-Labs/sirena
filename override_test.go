@@ -352,7 +352,7 @@ func TestMergeOverride_Except(t *testing.T) {
 // the override's range.
 func TestValidateOverridesAgainstWorkspace_Dangling(t *testing.T) {
 	root := fixtureWorkspace(t, map[string]string{
-		"sirena.toml": "default_preset: default\n",
+		"sirena.yaml": "default_preset: default\n",
 		"hand.sir":    `service ghost @override(label)`,
 		// No .gen.sir declares ghost.
 	})
@@ -377,7 +377,7 @@ func TestValidateOverridesAgainstWorkspace_Dangling(t *testing.T) {
 // fires.
 func TestValidateOverridesAgainstWorkspace_Resolved(t *testing.T) {
 	root := fixtureWorkspace(t, map[string]string{
-		"sirena.toml":  "default_preset: default\n",
+		"sirena.yaml":  "default_preset: default\n",
 		"hand.sir":     `service api @override(label)`,
 		"auto.gen.sir": `service api`,
 	})

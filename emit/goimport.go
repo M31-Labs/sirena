@@ -109,7 +109,7 @@ func GoPackageGraph(dir string) (*sirena.Document, error) {
 		return nil, fmt.Errorf("no Go packages found under %s", dir)
 	}
 
-	return buildDoc(pkgs), nil
+	return buildDoc(module, pkgs), nil
 }
 
 // goPkg is the per-package accumulator built during the walk.
@@ -121,8 +121,11 @@ type goPkg struct {
 }
 
 // buildDoc turns the accumulated packages into a single-system Document
-// with deterministic element and edge ordering.
-func buildDoc(pkgs map[string]*goPkg) *sirena.Document {
+// with deterministic element and edge ordering. Each element carries
+// round-trip identity metadata — a "package" symbol_kind and a source_ref in
+// the code://go/<module>#<package> scheme — so emit --update can reconcile a
+// regenerated graph against a prior .gen.sir (sid > source_ref > fuzzy).
+func buildDoc(module string, pkgs map[string]*goPkg) *sirena.Document {
 	sys := &sirena.SystemDecl{}
 
 	paths := make([]string, 0, len(pkgs))
@@ -138,9 +141,13 @@ func buildDoc(pkgs map[string]*goPkg) *sirena.Document {
 			kind = sirena.ElementKindGateway
 		}
 		sys.Elements = append(sys.Elements, &sirena.Element{
-			Kind:     kind,
-			Name:     p.id,
-			Metadata: map[string]sirena.Value{"label": sirena.String{Value: p.label}},
+			Kind: kind,
+			Name: p.id,
+			Metadata: map[string]sirena.Value{
+				"label":       sirena.String{Value: p.label},
+				"symbol_kind": sirena.String{Value: "package"},
+				"source_ref":  sirena.String{Value: sourceRefForPackage(module, path)},
+			},
 		})
 	}
 
@@ -209,6 +216,19 @@ func collectImportStrings(n *gt.Node, lang *gt.Language, src []byte, out *[]stri
 	for i := 0; i < n.NamedChildCount(); i++ {
 		collectImportStrings(n.NamedChild(i), lang, src, out)
 	}
+}
+
+// sourceRefForPackage builds the round-trip source_ref URI for a package in
+// the code://go/<module>#<package> scheme. The fragment is the package path
+// relative to the module ("." for the module root). Because the fuzzy
+// rename heuristic keys on the post-# suffix, a module rename keeps the
+// suffix stable and the package's identity (sid) carries forward.
+func sourceRefForPackage(module, importPath string) string {
+	rel := strings.TrimPrefix(strings.TrimPrefix(importPath, module), "/")
+	if rel == "" {
+		rel = "."
+	}
+	return "code://go/" + module + "#" + rel
 }
 
 // identFor maps a package import path to a sirena identifier by stripping

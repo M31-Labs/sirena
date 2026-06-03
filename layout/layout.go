@@ -36,6 +36,20 @@ const (
 	skeletonPadding = 24.0
 )
 
+// Render renders a resolved view to a positioned layout with the layout
+// engine guaranteed to be linked. It is the convenience entrypoint for
+// library consumers: because calling it requires importing this package, the
+// init above has already registered the engine into sirena.Render, so
+// Render never returns the engine-not-linked nil *LayoutResult that bare
+// sirena.Render yields when the layout package is absent from the build.
+//
+// The options and error contract are identical to sirena.Render (see its
+// doc comment) — Render simply forwards. Reach for sirena.Render directly
+// only on the budget-only path where no geometry is needed.
+func Render(rv *sirena.ResolvedView, opts sirena.RenderOptions) (*sirena.LayoutResult, *sirena.BudgetReport, error) {
+	return sirena.Render(rv, opts)
+}
+
 // Compute is the public layout entrypoint. It turns a resolved view into
 // a positioned *sirena.LayoutResult. The seed is taken from opts.Seed
 // when set, otherwise derived from sirena.ViewHash(rv) so identical

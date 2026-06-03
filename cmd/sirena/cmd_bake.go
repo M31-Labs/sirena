@@ -9,28 +9,36 @@ import (
 	"m31labs.dev/sirena/render/svg"
 )
 
-// RunBake implements `sirena bake [--theme name] [--infer] <markdown-file>...`.
+// RunBake implements
+// `sirena bake [--theme name] [--infer] [--check|--dry-run] <markdown-file>...`.
 //
 // Each markdown file is scanned for diagram fences (mermaid, sirena/sir); each
 // fence is rendered to SVG and the markdown is rewritten in place. A per-file
 // summary is printed to stdout. Block errors and I/O errors are printed to
 // stderr.
 //
+// --check and --dry-run both render without writing any file and report which
+// paths would change. They differ only in exit code: --check exits non-zero
+// when anything is stale (for CI), while --dry-run is report-only. When both
+// are given, --check wins.
+//
 // Exit codes:
 //
-//	0  all files baked with no block errors
-//	1  at least one file returned an error or had a block error
+//	0  all files baked (or, under --check, everything up to date) with no errors
+//	1  at least one file errored, had a block error, or (under --check) is stale
 //	2  misuse — no args, bad flag, or unknown theme
 func RunBake(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("bake", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	themeName := fs.String("theme", svg.DefaultThemeName, "theme name")
 	infer := fs.Bool("infer", false, "promote Mermaid shapes/labels to typed sirena kinds")
+	check := fs.Bool("check", false, "report files that would change and exit non-zero if any are stale; writes nothing")
+	dryRun := fs.Bool("dry-run", false, "report files that would change without writing; always exits zero")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
 	if fs.NArg() == 0 {
-		fmt.Fprintln(stderr, "usage: sirena bake [--theme name] [--infer] <markdown-file>...")
+		fmt.Fprintln(stderr, "usage: sirena bake [--theme name] [--infer] [--check|--dry-run] <markdown-file>...")
 		return 2
 	}
 
@@ -40,9 +48,11 @@ func RunBake(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
+	noWrite := *check || *dryRun
 	opts := bake.Options{
-		Infer: *infer,
-		Theme: *themeName,
+		Infer:  *infer,
+		Theme:  *themeName,
+		DryRun: noWrite,
 	}
 
 	exitCode := 0
@@ -58,8 +68,23 @@ func RunBake(args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "%s: %v\n", mdPath, err)
 		}
 
-		// Print per-file summary to stdout.
-		fmt.Fprintf(stdout, "baked %s: %d diagrams, %d svgs\n", mdPath, res.BlocksBaked, res.SVGsWritten)
+		if noWrite {
+			// Report staleness instead of writing.
+			if len(res.StalePaths) == 0 {
+				fmt.Fprintf(stdout, "up to date %s\n", mdPath)
+			} else {
+				fmt.Fprintf(stdout, "stale %s: %d file(s) would change\n", mdPath, len(res.StalePaths))
+				for _, p := range res.StalePaths {
+					fmt.Fprintf(stdout, "  %s\n", p)
+				}
+				if *check {
+					exitCode = 1
+				}
+			}
+		} else {
+			// Print per-file summary to stdout.
+			fmt.Fprintf(stdout, "baked %s: %d diagrams, %d svgs\n", mdPath, res.BlocksBaked, res.SVGsWritten)
+		}
 
 		if err != nil || len(res.BlockErrors) > 0 {
 			exitCode = 1

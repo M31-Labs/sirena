@@ -1,12 +1,9 @@
-// Package sirena: workspace manifest (sirena.toml) parser.
+// Package sirena: workspace manifest (sirena.yaml) parser.
 //
-// Format note: the workspace manifest filename is conventionally
-// `sirena.toml`, but the v0.1 implementation parses it as YAML using
-// gopkg.in/yaml.v3. The `.toml` extension is a misnomer carried forward
-// from early notes; the extension rename is deferred to Plan 6 so the
-// rest of v0.1 can land without touching every reference to the
-// filename. Contributors editing this file should treat the format as
-// YAML.
+// Format note: the workspace manifest is `sirena.yaml`, parsed as YAML
+// using gopkg.in/yaml.v3. The pre-v0.1.0 name was `sirena.toml` — a
+// misnomer, since the format was always YAML; OpenWorkspace still reads it
+// as a deprecated fallback (see workspace.go).
 package sirena
 
 import (
@@ -15,10 +12,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Manifest captures workspace-level defaults declared in sirena.toml at
-// the workspace root. v0.1 parses the file as YAML despite the .toml
-// extension (the rename is deferred to Plan 6 — see the package-level
-// note above).
+// Manifest captures workspace-level defaults declared in sirena.yaml at
+// the workspace root (or the deprecated sirena.toml fallback). The file is
+// parsed as YAML — see the package-level note above.
 //
 // Every field is optional. Workspace loading layers defaults on top of
 // a missing or partial manifest; downstream consumers should treat the
@@ -45,6 +41,14 @@ type Manifest struct {
 	// Layout carries the workspace-default layout block. Nil when the
 	// manifest omits the `layout` key.
 	Layout *ManifestLayout
+	// Exclude is a list of glob patterns that prune files and directories
+	// from workspace enumeration. Each pattern is matched (via path.Match)
+	// against both the workspace-relative path and the base name of every
+	// candidate, so "testdata" prunes any directory of that name at any
+	// depth, "*.gen.sir" drops every generated file, and "examples/demo"
+	// targets a specific subtree. Corresponds to the `exclude` YAML key.
+	// Empty when the manifest omits the directive.
+	Exclude []string
 	// Range covers the manifest bytes; useful when the manifest is
 	// embedded in a larger document or surfaced in diagnostics. For a
 	// standalone file, Start is 0 and End is len(src).
@@ -70,15 +74,16 @@ type manifestYAML struct {
 	OutputDir     string              `yaml:"output_dir"`
 	SirenaVersion string              `yaml:"sirena_version"`
 	Layout        *manifestLayoutYAML `yaml:"layout"`
+	Exclude       []string            `yaml:"exclude"`
 }
 
 type manifestLayoutYAML struct {
 	Direction string `yaml:"direction"`
 }
 
-// ParseManifest decodes a sirena.toml workspace manifest. The file is
-// parsed as YAML in v0.1 despite the `.toml` extension (see the
-// package-level note). Empty or nil input yields a zero-value
+// ParseManifest decodes a sirena.yaml workspace manifest. The file is
+// parsed as YAML (see the package-level note). Empty or nil input yields a
+// zero-value
 // *Manifest, not an error — callers loading a possibly-missing file can
 // pass the raw bytes through without special-casing absence.
 func ParseManifest(src []byte) (*Manifest, error) {
@@ -94,6 +99,7 @@ func ParseManifest(src []byte) (*Manifest, error) {
 	m.Theme = raw.Theme
 	m.OutputDir = raw.OutputDir
 	m.SirenaVersion = raw.SirenaVersion
+	m.Exclude = raw.Exclude
 	if raw.Layout != nil {
 		m.Layout = &ManifestLayout{Direction: raw.Layout.Direction}
 	}

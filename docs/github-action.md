@@ -23,14 +23,15 @@ message, author, and push target.
 | `paths` | yes | — | Space- or newline-separated globs of Markdown files, e.g. `"docs/**/*.md README.md"` |
 | `theme` | no | `earth-default` | Sirena theme name |
 | `infer` | no | `false` | When `"true"`, promote Mermaid shapes/labels to typed Sirena kinds |
+| `check` | no | `false` | When `"true"`, verify mode: render but write nothing, and fail if any committed SVG/Markdown is stale. Use in CI to enforce up-to-date diagrams |
 | `working-directory` | no | `.` | Directory to run `sirena bake` from |
 
 ## Exit codes
 
 | Code | Meaning |
 |---|---|
-| 0 | All diagrams baked successfully |
-| 1 | One or more diagrams failed to render |
+| 0 | All diagrams baked successfully (or, in `check` mode, everything is up to date) |
+| 1 | One or more diagrams failed to render — or, in `check` mode, a committed SVG/Markdown is stale |
 | 2 | Misuse — bad flag, unknown theme, or no files matched |
 
 ## Minimal usage
@@ -74,6 +75,31 @@ jobs:
             git push
           fi
 ```
+
+## Verify mode (CI gate)
+
+Instead of committing baked SVGs back, you can make CI **fail** when a contributor
+changes a diagram fence but forgets to re-bake. Run the action with `check: "true"`
+on pull requests — it renders every diagram but writes nothing, exiting non-zero if
+any committed SVG or Markdown is out of date:
+
+```yaml
+on: [pull_request]
+
+jobs:
+  diagrams-up-to-date:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: M31-Labs/sirena@v1
+        with:
+          paths: "docs/**/*.md README.md"
+          check: "true"
+```
+
+The job stays green only while the committed SVGs match what `sirena bake` would
+produce. When it fails, re-run the action in write mode (`check: false`) locally or
+in a separate job, then commit the result.
 
 ## How SVGs render on GitHub
 

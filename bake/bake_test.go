@@ -412,6 +412,64 @@ func TestBake_ByteIdenticalSkip(t *testing.T) {
 	})
 }
 
+// ── Test 8: dry-run / check (compute without writing) ─────────────────────────
+
+// TestBake_DryRun_ReportsStaleWithoutWriting verifies that DryRun renders the
+// document but writes nothing: the markdown is left byte-identical, no SVG is
+// created, and Result.StalePaths lists the SVG and the markdown that WOULD be
+// written.
+func TestBake_DryRun_ReportsStaleWithoutWriting(t *testing.T) {
+	const origMD = "# Doc\n\n```mermaid\n" + validMermaidBody + "```\n"
+	mdPath := tempMD(t, "doc.md", origMD)
+	dir := filepath.Dir(mdPath)
+
+	res, err := bake.Bake(mdPath, bake.Options{DryRun: true})
+	if err != nil {
+		t.Fatalf("Bake(DryRun) error: %v", err)
+	}
+
+	// Markdown is unbaked → both the SVG and the markdown would change.
+	svgPath := filepath.Join(dir, "doc.1.svg")
+	wantStale := map[string]bool{svgPath: true, mdPath: true}
+	if len(res.StalePaths) != len(wantStale) {
+		t.Fatalf("StalePaths = %v, want the svg and the markdown", res.StalePaths)
+	}
+	for _, p := range res.StalePaths {
+		if !wantStale[p] {
+			t.Errorf("unexpected stale path %q", p)
+		}
+	}
+
+	// Nothing written: markdown byte-identical, SVG absent.
+	if got := string(readFile(t, mdPath)); got != origMD {
+		t.Errorf("DryRun modified the markdown:\n%s", got)
+	}
+	if _, statErr := os.Stat(svgPath); statErr == nil {
+		t.Errorf("DryRun wrote %s; it must not write any file", svgPath)
+	}
+	if res.SVGsWritten != 0 {
+		t.Errorf("SVGsWritten = %d, want 0 under DryRun", res.SVGsWritten)
+	}
+}
+
+// TestBake_DryRun_CleanIsNotStale verifies that after a real bake, a DryRun
+// reports nothing stale.
+func TestBake_DryRun_CleanIsNotStale(t *testing.T) {
+	mdPath := tempMD(t, "doc.md", "# Doc\n\n```mermaid\n"+validMermaidBody+"```\n")
+
+	if _, err := bake.Bake(mdPath, bake.Options{}); err != nil {
+		t.Fatalf("initial Bake error: %v", err)
+	}
+
+	res, err := bake.Bake(mdPath, bake.Options{DryRun: true})
+	if err != nil {
+		t.Fatalf("Bake(DryRun) error: %v", err)
+	}
+	if len(res.StalePaths) != 0 {
+		t.Errorf("StalePaths = %v, want none after a clean bake", res.StalePaths)
+	}
+}
+
 // ── Test 5: CRLF body ─────────────────────────────────────────────────────────
 
 func TestBake_CRLFBody(t *testing.T) {

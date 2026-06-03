@@ -76,6 +76,33 @@ func TestGoPackageGraph_ShapeAndEdges(t *testing.T) {
 	}
 }
 
+// TestGoPackageGraph_IdentityMetadata confirms each emitted package element
+// carries the round-trip identity metadata: a symbol_kind of "package" and a
+// source_ref URI in the code://go/<module>#<package> scheme. This is what the
+// agent-emission round trip (sid > source_ref > fuzzy) reconciles against.
+func TestGoPackageGraph_IdentityMetadata(t *testing.T) {
+	dir := writeFixtureModule(t)
+	doc, err := GoPackageGraph(dir)
+	if err != nil {
+		t.Fatalf("GoPackageGraph: %v", err)
+	}
+	want := map[string]string{
+		"m": "code://go/example.com/m#.",
+		"a": "code://go/example.com/m#a",
+		"b": "code://go/example.com/m#b",
+	}
+	for _, e := range doc.Systems[0].Elements {
+		sk, _ := e.Metadata["symbol_kind"].(sirena.String)
+		if sk.Value != "package" {
+			t.Errorf("%s: symbol_kind = %q, want \"package\"", e.Name, sk.Value)
+		}
+		sr, _ := e.Metadata["source_ref"].(sirena.String)
+		if sr.Value != want[e.Name] {
+			t.Errorf("%s: source_ref = %q, want %q", e.Name, sr.Value, want[e.Name])
+		}
+	}
+}
+
 // TestGoPackageGraph_Printable confirms the emitted document round-trips
 // through the public printer — i.e. the IR an emitter builds is the same IR
 // a hand author writes.

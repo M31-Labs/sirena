@@ -35,6 +35,7 @@ var rules = []RuleFunc{
 	DeadElement,
 	DanglingOverride,
 	Versions,
+	ManifestName,
 }
 
 // Run executes every rule in the lint package against ws and returns the

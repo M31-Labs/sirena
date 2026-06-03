@@ -13,7 +13,7 @@ import (
 // Versions rule must surface that warning.
 func TestVersions_OlderMinor(t *testing.T) {
 	root := tmpWorkspace(t, map[string]string{
-		"sirena.toml": "sirena_version: \"0.0\"\n",
+		"sirena.yaml": "sirena_version: \"0.0\"\n",
 		"x.sir":       "service api",
 	})
 	ws, err := sirena.OpenWorkspace(root)
@@ -36,7 +36,7 @@ func TestVersions_OlderMinor(t *testing.T) {
 // sirena_version should not trip the rule.
 func TestVersions_CurrentVersion(t *testing.T) {
 	root := tmpWorkspace(t, map[string]string{
-		"sirena.toml": "sirena_version: \"" + sirena.CurrentSpecVersion + "\"\n",
+		"sirena.yaml": "sirena_version: \"" + sirena.CurrentSpecVersion + "\"\n",
 		"x.sir":       "service api",
 	})
 	ws, err := sirena.OpenWorkspace(root)

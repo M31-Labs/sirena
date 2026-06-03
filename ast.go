@@ -13,7 +13,7 @@ type Document struct {
 	Systems []*SystemDecl
 	Views   []*ViewDecl
 	// Manifest carries the workspace-level defaults loaded from
-	// sirena.toml. It is nil unless the document was produced via a
+	// sirena.yaml. It is nil unless the document was produced via a
 	// workspace operation that loaded a manifest; Parse, which only
 	// sees a single .sir file body, never populates it.
 	Manifest *Manifest

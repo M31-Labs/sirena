@@ -117,7 +117,7 @@ func TestCompareMinorVersions_Cases(t *testing.T) {
 // silently drop fields the IR doesn't yet understand.
 func TestOpenWorkspace_RefusesNewerSirenaVersion(t *testing.T) {
 	root := fixtureWorkspace(t, map[string]string{
-		"sirena.toml": "sirena_version: \"0.2\"\n",
+		"sirena.yaml": "sirena_version: \"0.2\"\n",
 		"x.sir":       "service api",
 	})
 	_, err := sirena.OpenWorkspace(root)
@@ -136,7 +136,7 @@ func TestOpenWorkspace_RefusesNewerSirenaVersion(t *testing.T) {
 // ResolveDiagnostics.
 func TestOpenWorkspace_AcceptsOlderSirenaVersion(t *testing.T) {
 	root := fixtureWorkspace(t, map[string]string{
-		"sirena.toml": "sirena_version: \"0.0\"\n",
+		"sirena.yaml": "sirena_version: \"0.0\"\n",
 		"x.sir":       "service api",
 	})
 	ws, err := sirena.OpenWorkspace(root)
@@ -164,7 +164,7 @@ func TestOpenWorkspace_AcceptsOlderSirenaVersion(t *testing.T) {
 // with no version-related diagnostic.
 func TestOpenWorkspace_AcceptsSameSirenaVersion(t *testing.T) {
 	root := fixtureWorkspace(t, map[string]string{
-		"sirena.toml": "sirena_version: \"" + sirena.CurrentSpecVersion + "\"\n",
+		"sirena.yaml": "sirena_version: \"" + sirena.CurrentSpecVersion + "\"\n",
 		"x.sir":       "service api",
 	})
 	ws, err := sirena.OpenWorkspace(root)
@@ -186,7 +186,7 @@ func TestOpenWorkspace_AcceptsSameSirenaVersion(t *testing.T) {
 // workspace path) with no diagnostic surfaced.
 func TestOpenWorkspace_NoSirenaVersion(t *testing.T) {
 	root := fixtureWorkspace(t, map[string]string{
-		"sirena.toml": "theme: earth-default\n",
+		"sirena.yaml": "theme: earth-default\n",
 		"x.sir":       "service api",
 	})
 	ws, err := sirena.OpenWorkspace(root)

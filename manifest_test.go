@@ -7,14 +7,17 @@ import (
 )
 
 // TestParseManifest_FullCoverage parses a manifest exercising every
-// recognized field (DefaultPreset, Theme, OutputDir, Layout.Direction) and
-// verifies each one round-trips into the public Manifest struct.
+// recognized field (DefaultPreset, Theme, OutputDir, Layout.Direction,
+// Exclude) and verifies each one round-trips into the public Manifest struct.
 func TestParseManifest_FullCoverage(t *testing.T) {
 	src := []byte(`default_preset: default
 theme: earth-default
 output_dir: dist/diagrams
 layout:
   direction: top-down
+exclude:
+  - testdata
+  - "*.gen.sir"
 `)
 	m, err := sirena.ParseManifest(src)
 	if err != nil {
@@ -37,6 +40,9 @@ layout:
 	}
 	if m.Layout.Direction != "top-down" {
 		t.Errorf("Layout.Direction = %q, want %q", m.Layout.Direction, "top-down")
+	}
+	if len(m.Exclude) != 2 || m.Exclude[0] != "testdata" || m.Exclude[1] != "*.gen.sir" {
+		t.Errorf("Exclude = %v, want [testdata *.gen.sir]", m.Exclude)
 	}
 }
 

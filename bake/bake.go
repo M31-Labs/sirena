@@ -21,6 +21,12 @@ type Options struct {
 	Infer bool
 	// Theme is the SVG theme name; empty selects the default theme.
 	Theme string
+	// DryRun renders every block and computes the rewritten markdown but
+	// writes nothing to disk. Result.StalePaths lists the files whose
+	// on-disk content would change (an SVG that differs or is missing, or
+	// the markdown when its baked form differs). The CLI maps this to
+	// `--check` (exit non-zero when stale) and `--dry-run` (report-only).
+	DryRun bool
 }
 
 // BlockError records a per-block render failure.
@@ -45,6 +51,13 @@ type Result struct {
 	// BlockErrors holds per-block render failures. Each failed block's source
 	// is preserved unchanged in the output file.
 	BlockErrors []BlockError
+	// StalePaths lists paths whose on-disk content would change under a
+	// DryRun: rendered SVGs that differ from or are missing on disk, plus
+	// the markdown file when its baked form differs from the original.
+	// Populated only when Options.DryRun is set (nil on a normal write
+	// run). Ordered as encountered: SVGs in document order, the markdown
+	// last.
+	StalePaths []string
 }
 
 // Bake finds diagram fences in mdPath, renders each to SVG, and rewrites the
@@ -114,13 +127,20 @@ func Bake(mdPath string, opts Options) (Result, error) {
 			continue
 		}
 
-		// Write the SVG file.
+		// Write the SVG file (or, under DryRun, record staleness without
+		// writing — an SVG is stale when it differs from disk or is absent).
 		svgName := fmt.Sprintf("%s.%d.svg", docbase, n)
 		svgPath := filepath.Join(dir, svgName)
-		if werr := os.WriteFile(svgPath, svgBytes, 0o644); werr != nil {
-			return res, fmt.Errorf("bake: write %s: %w", svgPath, werr)
+		if opts.DryRun {
+			if existing, rerr := os.ReadFile(svgPath); rerr != nil || !bytes.Equal(existing, svgBytes) {
+				res.StalePaths = append(res.StalePaths, svgPath)
+			}
+		} else {
+			if werr := os.WriteFile(svgPath, svgBytes, 0o644); werr != nil {
+				return res, fmt.Errorf("bake: write %s: %w", svgPath, werr)
+			}
+			res.SVGsWritten++
 		}
-		res.SVGsWritten++
 
 		// Append the rewritten baked block.
 		out.WriteString(rewriteBlock(blk.Lang, body, svgName, n))
@@ -131,9 +151,22 @@ func Bake(mdPath string, opts Options) (Result, error) {
 	// Append any trailing content after the last block.
 	out.Write(src[prevEnd:])
 
+	outBytes := []byte(out.String())
+
+	// DryRun: record whether the markdown itself would change, then return
+	// without touching disk. SVG staleness was already recorded in the loop.
+	if opts.DryRun {
+		if !bytes.Equal(outBytes, src) {
+			res.StalePaths = append(res.StalePaths, mdPath)
+		}
+		if len(res.BlockErrors) > 0 {
+			return res, joinBlockErrors(res.BlockErrors)
+		}
+		return res, nil
+	}
+
 	// Fix 3: skip the write entirely when the output is byte-identical to the
 	// original source (covers no-renderable-blocks and all-blocks-failed cases).
-	outBytes := []byte(out.String())
 	if bytes.Equal(outBytes, src) {
 		if len(res.BlockErrors) > 0 {
 			return res, joinBlockErrors(res.BlockErrors)

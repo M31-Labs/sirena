@@ -129,6 +129,80 @@ func TestRunBake_PartialFailure(t *testing.T) {
 	}
 }
 
+// ── TestRunBake_Check / DryRun ────────────────────────────────────────────────
+
+// TestRunBake_CheckStaleExitsNonZero verifies --check reports staleness, writes
+// nothing, and exits 1 so CI fails on uncommitted SVG/markdown drift.
+func TestRunBake_CheckStaleExitsNonZero(t *testing.T) {
+	dir := t.TempDir()
+	mdPath := filepath.Join(dir, "doc.md")
+	if err := os.WriteFile(mdPath, []byte(validMermaidMD), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var out, errBuf bytes.Buffer
+	code := RunBake([]string{"--check", mdPath}, &out, &errBuf)
+	if code != 1 {
+		t.Fatalf("--check on stale file exit = %d, want 1. stdout=%q stderr=%q", code, out.String(), errBuf.String())
+	}
+
+	// Nothing written.
+	if _, err := os.Stat(filepath.Join(dir, "doc.1.svg")); err == nil {
+		t.Errorf("--check wrote doc.1.svg; it must not write")
+	}
+	if got, _ := os.ReadFile(mdPath); string(got) != validMermaidMD {
+		t.Errorf("--check modified the markdown")
+	}
+	// The stale file is named on stdout.
+	if !strings.Contains(out.String(), "doc.md") {
+		t.Errorf("stdout missing stale file name; got %q", out.String())
+	}
+}
+
+// TestRunBake_CheckCleanExitsZero verifies --check exits 0 once everything is
+// baked and up to date.
+func TestRunBake_CheckCleanExitsZero(t *testing.T) {
+	dir := t.TempDir()
+	mdPath := filepath.Join(dir, "doc.md")
+	if err := os.WriteFile(mdPath, []byte(validMermaidMD), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Bake for real first.
+	var out, errBuf bytes.Buffer
+	if code := RunBake([]string{mdPath}, &out, &errBuf); code != 0 {
+		t.Fatalf("initial bake exit %d; stderr %s", code, errBuf.String())
+	}
+
+	out.Reset()
+	errBuf.Reset()
+	if code := RunBake([]string{"--check", mdPath}, &out, &errBuf); code != 0 {
+		t.Fatalf("--check on clean file exit %d, want 0. stdout=%q stderr=%q", code, out.String(), errBuf.String())
+	}
+}
+
+// TestRunBake_DryRunExitsZeroAndWritesNothing verifies --dry-run reports drift
+// but always exits 0 and writes nothing.
+func TestRunBake_DryRunExitsZeroAndWritesNothing(t *testing.T) {
+	dir := t.TempDir()
+	mdPath := filepath.Join(dir, "doc.md")
+	if err := os.WriteFile(mdPath, []byte(validMermaidMD), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var out, errBuf bytes.Buffer
+	code := RunBake([]string{"--dry-run", mdPath}, &out, &errBuf)
+	if code != 0 {
+		t.Fatalf("--dry-run exit %d, want 0. stderr %s", code, errBuf.String())
+	}
+	if _, err := os.Stat(filepath.Join(dir, "doc.1.svg")); err == nil {
+		t.Errorf("--dry-run wrote doc.1.svg; it must not write")
+	}
+	if got, _ := os.ReadFile(mdPath); string(got) != validMermaidMD {
+		t.Errorf("--dry-run modified the markdown")
+	}
+}
+
 // ── TestRunBake_Misuse ────────────────────────────────────────────────────────
 
 func TestRunBake_NoArgs(t *testing.T) {

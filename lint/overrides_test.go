@@ -13,7 +13,7 @@ import (
 // negative-case coverage in the root package.
 func TestDanglingOverride(t *testing.T) {
 	root := tmpWorkspace(t, map[string]string{
-		"sirena.toml": "default_preset: default\n",
+		"sirena.yaml": "default_preset: default\n",
 		"x.sir":       `service ghost @override(label)`,
 		// No .gen.sir declares ghost — the override has nothing to override.
 	})

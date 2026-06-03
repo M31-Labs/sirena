@@ -20,6 +20,14 @@ inputs:
       When "true", promote Mermaid shapes and labels to typed Sirena kinds.
     required: false
     default: "false"
+  check:
+    description: >
+      When "true", run in verify mode: render every diagram but write nothing,
+      and fail (exit 1) if any committed SVG or Markdown is stale. Use this in
+      CI to ensure baked diagrams are kept up to date — the job fails until the
+      author re-runs the action in write mode and commits the result.
+    required: false
+    default: "false"
   working-directory:
     description: >
       Directory to run sirena bake from. Defaults to the repo root.
@@ -34,3 +42,4 @@ runs:
     - ${{ inputs.theme }}
     - ${{ inputs.infer }}
     - ${{ inputs.working-directory }}
+    - ${{ inputs.check }}

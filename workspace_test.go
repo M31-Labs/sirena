@@ -33,7 +33,7 @@ func fixtureWorkspace(t *testing.T, files map[string]string) string {
 // files under dot-prefixed directories are silently skipped.
 func TestOpenWorkspace_EnumeratesAllKinds(t *testing.T) {
 	root := fixtureWorkspace(t, map[string]string{
-		"sirena.toml":                  "default_preset: default\ntheme: earth-default\n",
+		"sirena.yaml":                  "default_preset: default\ntheme: earth-default\n",
 		"services/api.sir":             "service api",
 		"services/db.sir":              "database db",
 		"diagrams/data-plane.view.sir": `view "data-plane" { preset: default }`,
@@ -81,7 +81,7 @@ func TestOpenWorkspace_EnumeratesAllKinds(t *testing.T) {
 	}
 }
 
-// TestOpenWorkspace_NoManifest confirms a workspace without sirena.toml
+// TestOpenWorkspace_NoManifest confirms a workspace without a manifest
 // still opens cleanly: Manifest is nil (not an error) and files enumerate
 // normally. This is the bare-directory case for `sirena lint` against a
 // scratch tree.
@@ -102,16 +102,134 @@ func TestOpenWorkspace_NoManifest(t *testing.T) {
 }
 
 // TestOpenWorkspace_MalformedManifest asserts a syntactically broken
-// sirena.toml fails the whole workspace open. The manifest is
+// sirena.yaml fails the whole workspace open. The manifest is
 // workspace-scoped so the failure must be loud — silently opening with a
 // nil manifest would mask theme / preset / output_dir mistakes.
 func TestOpenWorkspace_MalformedManifest(t *testing.T) {
 	root := fixtureWorkspace(t, map[string]string{
-		"sirena.toml": `theme: "unterminated`,
+		"sirena.yaml": `theme: "unterminated`,
 	})
 	_, err := sirena.OpenWorkspace(root)
 	if err == nil {
 		t.Fatal("expected error for malformed manifest")
+	}
+}
+
+// TestOpenWorkspace_PrefersYAMLManifest confirms the canonical sirena.yaml
+// manifest name is read and produces no deprecation diagnostic.
+func TestOpenWorkspace_PrefersYAMLManifest(t *testing.T) {
+	root := fixtureWorkspace(t, map[string]string{
+		"sirena.yaml": "default_preset: default\ntheme: earth-default\n",
+		"api.sir":     "service api",
+	})
+	ws, err := sirena.OpenWorkspace(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ws.Manifest == nil {
+		t.Fatal("Manifest nil; sirena.yaml not read")
+	}
+	if ws.Manifest.Theme != "earth-default" {
+		t.Errorf("Theme = %q, want earth-default", ws.Manifest.Theme)
+	}
+	for _, d := range ws.ResolveDiagnostics() {
+		if d.Code == "SIR-MANIFEST-LEGACY-NAME" {
+			t.Errorf("sirena.yaml must not emit a legacy-name warning; got %+v", d)
+		}
+	}
+}
+
+// TestOpenWorkspace_LegacyTOMLFallbackWarns confirms a workspace with only the
+// deprecated sirena.toml name is still read, but surfaces a
+// SIR-MANIFEST-LEGACY-NAME warning so the rename can be nudged.
+func TestOpenWorkspace_LegacyTOMLFallbackWarns(t *testing.T) {
+	root := fixtureWorkspace(t, map[string]string{
+		"sirena.toml": "default_preset: default\n",
+		"api.sir":     "service api",
+	})
+	ws, err := sirena.OpenWorkspace(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ws.Manifest == nil {
+		t.Fatal("Manifest nil; sirena.toml fallback not read")
+	}
+	if ws.Manifest.DefaultPreset != "default" {
+		t.Errorf("DefaultPreset = %q, want default", ws.Manifest.DefaultPreset)
+	}
+	var found bool
+	for _, d := range ws.ResolveDiagnostics() {
+		if d.Code == "SIR-MANIFEST-LEGACY-NAME" {
+			found = true
+			if d.Severity != sirena.SeverityWarning {
+				t.Errorf("legacy-name severity = %v, want warning", d.Severity)
+			}
+		}
+	}
+	if !found {
+		t.Error("expected SIR-MANIFEST-LEGACY-NAME warning for sirena.toml fallback")
+	}
+}
+
+// TestOpenWorkspace_YAMLWinsOverLegacy confirms that when both names exist,
+// sirena.yaml is used and no deprecation warning fires.
+func TestOpenWorkspace_YAMLWinsOverLegacy(t *testing.T) {
+	root := fixtureWorkspace(t, map[string]string{
+		"sirena.yaml": "theme: yaml-theme\n",
+		"sirena.toml": "theme: toml-theme\n",
+		"api.sir":     "service api",
+	})
+	ws, err := sirena.OpenWorkspace(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ws.Manifest == nil || ws.Manifest.Theme != "yaml-theme" {
+		t.Fatalf("expected sirena.yaml to win; Manifest = %+v", ws.Manifest)
+	}
+	for _, d := range ws.ResolveDiagnostics() {
+		if d.Code == "SIR-MANIFEST-LEGACY-NAME" {
+			t.Errorf("sirena.yaml present → no legacy warning; got %+v", d)
+		}
+	}
+}
+
+// TestOpenWorkspace_ExcludePatterns confirms manifest `exclude` globs prune
+// matching directories and files from enumeration, so workspace tooling
+// (lint, resolve, render) ignores fixtures, examples, and generated trees.
+// Patterns match against the workspace-relative path and the base name, so
+// "testdata" prunes any directory of that name and "*.gen.sir" drops every
+// generated file regardless of directory.
+func TestOpenWorkspace_ExcludePatterns(t *testing.T) {
+	root := fixtureWorkspace(t, map[string]string{
+		"sirena.yaml":           "exclude:\n  - testdata\n  - \"*.gen.sir\"\n",
+		"api.sir":               "service api",
+		"sub/keep.sir":          "service keep",
+		"testdata/fixture.sir":  "service fixture",
+		"nested/testdata/x.sir": "service nestedfixture",
+		"generated/x.gen.sir":   "service gen",
+	})
+	ws, err := sirena.OpenWorkspace(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]bool{}
+	for _, f := range ws.Files {
+		got[f.RelPath] = true
+	}
+	if !got["api.sir"] {
+		t.Error("api.sir should be included")
+	}
+	if !got["sub/keep.sir"] {
+		t.Error("sub/keep.sir should be included")
+	}
+	if got["testdata/fixture.sir"] {
+		t.Error("testdata/ should be excluded by the \"testdata\" pattern")
+	}
+	if got["nested/testdata/x.sir"] {
+		t.Error("nested testdata/ should be excluded (pattern matches dir name at any depth)")
+	}
+	if got["generated/x.gen.sir"] {
+		t.Error("*.gen.sir should be excluded by base-name match")
 	}
 }
 

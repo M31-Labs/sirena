@@ -6,10 +6,11 @@
 #   $2 = theme              sirena theme name  (default: earth-default)
 #   $3 = infer              "true" | "false"   (default: false)
 #   $4 = working-directory  run directory      (default: .)
+#   $5 = check              "true" | "false"   (default: false)
 #
 # Exit codes mirror sirena bake:
-#   0  all diagrams baked successfully
-#   1  one or more render errors
+#   0  all diagrams baked (or, in check mode, everything up to date)
+#   1  one or more render errors, or (check mode) a stale committed SVG/Markdown
 #   2  misuse (bad flags, unknown theme, no files)
 set -e
 
@@ -17,6 +18,7 @@ INPUT_PATHS="$1"
 THEME="${2:-earth-default}"
 INFER="${3:-false}"
 WORKDIR="${4:-.}"
+CHECK="${5:-false}"
 
 if [ -z "$INPUT_PATHS" ]; then
   echo "::error::sirena-bake: 'paths' input is required" >&2
@@ -34,6 +36,7 @@ PATHS_FLAT=$(printf '%s' "$INPUT_PATHS" | tr '\n' ' ')
 # plain string concatenation.
 set -- --theme "$THEME"
 [ "$INFER" = "true" ] && set -- "$@" --infer
+[ "$CHECK" = "true" ] && set -- "$@" --check
 
 FILE_COUNT=0
 for GLOB in $PATHS_FLAT; do
@@ -53,6 +56,7 @@ fi
 echo "::group::Sirena Bake"
 printf 'theme:   %s\n' "$THEME"
 printf 'infer:   %s\n' "$INFER"
+printf 'check:   %s\n' "$CHECK"
 printf 'workdir: %s\n' "$WORKDIR"
 printf 'files:   %d matched\n' "$FILE_COUNT"
 echo ""
@@ -66,7 +70,13 @@ echo "::endgroup::"
 
 case "$EXIT_CODE" in
   0) ;;
-  1) echo "::error::sirena-bake: one or more diagrams failed to render" ;;
+  1)
+    if [ "$CHECK" = "true" ]; then
+      echo "::error::sirena-bake: committed diagrams are stale — run the action in write mode (check: false) and commit the result"
+    else
+      echo "::error::sirena-bake: one or more diagrams failed to render"
+    fi
+    ;;
   2) echo "::error::sirena-bake: misuse — bad flags or unknown theme" ;;
   *) echo "::error::sirena-bake: unexpected exit code $EXIT_CODE" ;;
 esac

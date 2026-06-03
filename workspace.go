@@ -2,7 +2,7 @@
 //
 // A Workspace is the unit of cross-file resolution: a directory tree
 // containing .sir, .view.sir, and .gen.sir files, rooted at the directory
-// holding sirena.toml. Most operations on a Workspace target the symbol
+// holding sirena.yaml. Most operations on a Workspace target the symbol
 // table or per-file diagnostics; the workspace itself is the registry of
 // what files exist and what mode the workspace is in.
 //
@@ -15,16 +15,23 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
 )
 
-// manifestFileName is the conventional name of the workspace manifest at
-// the workspace root. The `.toml` extension is a historical misnomer — the
-// file is parsed as YAML in v0.1 (see manifest.go for the carry-forward
-// note). The rename is deferred to Plan 6.
-const manifestFileName = "sirena.toml"
+// manifestFileName is the canonical name of the workspace manifest at the
+// workspace root. The file is parsed as YAML (see manifest.go).
+const manifestFileName = "sirena.yaml"
+
+// legacyManifestFileName is the pre-v0.1.0 manifest name. OpenWorkspace
+// still reads it as a fallback when sirena.yaml is absent, but its use
+// surfaces a SIR-MANIFEST-LEGACY-NAME deprecation warning (forwarded by the
+// lint pack's ManifestName rule). The `.toml` extension was always a
+// misnomer — the file format is and always was YAML — so the rename is a
+// pure name change, not a format change.
+const legacyManifestFileName = "sirena.toml"
 
 // WorkspaceMode discriminates how a workspace was constructed.
 //
@@ -154,15 +161,17 @@ type WorkspaceFile struct {
 //
 // Root is the absolute directory the workspace was opened from; it is
 // empty for synthesized SelfContained / WorkspaceResolving workspaces.
-// Manifest is non-nil only when a sirena.toml was present at Root.
-// Files is the sorted, deterministic list of enumerated source files.
+// Manifest is non-nil only when a sirena.yaml (or the deprecated
+// sirena.toml) was present at Root. Files is the sorted, deterministic
+// list of enumerated source files.
 type Workspace struct {
 	// Root is the absolute path to the workspace root, or empty for
 	// synthesized fence workspaces.
 	Root string
 	// Mode discriminates how the workspace was constructed.
 	Mode WorkspaceMode
-	// Manifest is the parsed sirena.toml manifest, or nil if absent.
+	// Manifest is the parsed workspace manifest (sirena.yaml, or the
+	// deprecated sirena.toml fallback), or nil if absent.
 	Manifest *Manifest
 	// Files is the sorted list of enumerated .sir / .view.sir / .gen.sir
 	// files under Root.
@@ -321,8 +330,10 @@ func findHostFile(host *Workspace, ref string) *WorkspaceFile {
 }
 
 // OpenWorkspace walks root for `.sir`, `.view.sir`, `.gen.sir` files and
-// parses the workspace manifest from sirena.toml if present. The returned
-// Workspace has Mode == ModeStandalone. Each file is enumerated but NOT
+// parses the workspace manifest from sirena.yaml if present (falling back to
+// the deprecated sirena.toml name, which surfaces a SIR-MANIFEST-LEGACY-NAME
+// warning). The returned Workspace has Mode == ModeStandalone. Each file is
+// enumerated but NOT
 // parsed; callers load documents on demand via LoadDocument so a
 // workspace with hundreds of files opens in O(file-count) syscalls
 // instead of O(parse-cost).
@@ -347,13 +358,28 @@ func OpenWorkspace(root string) (*Workspace, error) {
 		Mode: ModeStandalone,
 	}
 
-	manifestPath := filepath.Join(abs, manifestFileName)
-	manifestBytes, err := os.ReadFile(manifestPath)
+	// Read the canonical sirena.yaml manifest, falling back to the
+	// deprecated sirena.toml name when it is absent. usedName tracks which
+	// name actually supplied the bytes so diagnostics name the real file.
+	usedName := manifestFileName
+	manifestBytes, err := os.ReadFile(filepath.Join(abs, manifestFileName))
+	if errors.Is(err, fs.ErrNotExist) {
+		if legacyBytes, legacyErr := os.ReadFile(filepath.Join(abs, legacyManifestFileName)); legacyErr == nil {
+			manifestBytes, err = legacyBytes, nil
+			usedName = legacyManifestFileName
+			ws.synthDiagnostics = append(ws.synthDiagnostics, Diagnostic{
+				Code:     "SIR-MANIFEST-LEGACY-NAME",
+				Severity: SeverityWarning,
+				Message: fmt.Sprintf("workspace manifest %q is deprecated; rename it to %q (the format is unchanged — it is YAML)",
+					legacyManifestFileName, manifestFileName),
+			})
+		}
+	}
 	switch {
 	case err == nil:
 		m, mErr := ParseManifest(manifestBytes)
 		if mErr != nil {
-			return nil, fmt.Errorf("sirena: parse %s: %w", manifestFileName, mErr)
+			return nil, fmt.Errorf("sirena: parse %s: %w", usedName, mErr)
 		}
 		ws.Manifest = m
 		// Version-skew check: refuse newer minors loudly so a partial
@@ -361,23 +387,23 @@ func OpenWorkspace(root string) (*Workspace, error) {
 		// understand. Older minors are accepted with an upgrade-hint
 		// diagnostic surfaced through ResolveDiagnostics.
 		if vDiag, ok := CheckVersion(m.SirenaVersion); !ok {
-			return nil, fmt.Errorf("sirena: %s: %s: %s", manifestFileName, vDiag.Code, vDiag.Message)
+			return nil, fmt.Errorf("sirena: %s: %s: %s", usedName, vDiag.Code, vDiag.Message)
 		} else if vDiag.Code != "" {
 			ws.synthDiagnostics = append(ws.synthDiagnostics, vDiag)
 		}
 	case errors.Is(err, fs.ErrNotExist):
-		// Missing manifest is OK; Manifest stays nil.
+		// No manifest under either name is OK; Manifest stays nil.
 	default:
 		return nil, fmt.Errorf("sirena: read %s: %w", manifestFileName, err)
 	}
 
-	walkErr := filepath.WalkDir(abs, func(path string, d fs.DirEntry, walkErr error) error {
+	walkErr := filepath.WalkDir(abs, func(filePath string, d fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			// The root must be walkable, but an unreadable sibling
 			// directory under the chosen root should not abort enumeration
 			// of the rest of the workspace. Skip the offending subtree and
 			// continue.
-			if path == abs {
+			if filePath == abs {
 				return walkErr
 			}
 			if d != nil && d.IsDir() {
@@ -389,8 +415,17 @@ func OpenWorkspace(root string) (*Workspace, error) {
 		// itself, which may legitimately live under a dot-prefixed
 		// parent the caller chose).
 		if d.IsDir() {
-			if path != abs && strings.HasPrefix(d.Name(), ".") {
+			if filePath != abs && strings.HasPrefix(d.Name(), ".") {
 				return filepath.SkipDir
+			}
+			// Prune manifest-excluded directory subtrees (testdata,
+			// examples, generated fixtures) so they never reach the
+			// resolver or the linter.
+			if filePath != abs && ws.Manifest != nil {
+				rel, relErr := filepath.Rel(abs, filePath)
+				if relErr == nil && matchesAnyExclude(filepath.ToSlash(rel), d.Name(), ws.Manifest.Exclude) {
+					return filepath.SkipDir
+				}
 			}
 			return nil
 		}
@@ -398,12 +433,16 @@ func OpenWorkspace(root string) (*Workspace, error) {
 		if kind == FileKindUnknown {
 			return nil
 		}
-		rel, relErr := filepath.Rel(abs, path)
+		rel, relErr := filepath.Rel(abs, filePath)
 		if relErr != nil {
 			return relErr
 		}
+		// Honor manifest exclude globs for individual files too.
+		if ws.Manifest != nil && matchesAnyExclude(filepath.ToSlash(rel), d.Name(), ws.Manifest.Exclude) {
+			return nil
+		}
 		ws.Files = append(ws.Files, &WorkspaceFile{
-			Path:    path,
+			Path:    filePath,
 			RelPath: filepath.ToSlash(rel),
 			Kind:    kind,
 		})
@@ -417,6 +456,28 @@ func OpenWorkspace(root string) (*Workspace, error) {
 		return ws.Files[i].RelPath < ws.Files[j].RelPath
 	})
 	return ws, nil
+}
+
+// matchesAnyExclude reports whether a workspace-relative path (forward
+// slashed) or its base name matches any of the manifest's exclude globs.
+// Matching both forms means "testdata" prunes a directory of that name at
+// any depth (base-name match), "*.gen.sir" drops generated files anywhere
+// (base-name match), and "examples/demo" targets a specific subtree
+// (rel-path match). Malformed patterns (path.ErrBadPattern) are treated as
+// non-matches rather than aborting enumeration.
+func matchesAnyExclude(rel, base string, patterns []string) bool {
+	for _, pat := range patterns {
+		if pat == "" {
+			continue
+		}
+		if ok, err := path.Match(pat, rel); err == nil && ok {
+			return true
+		}
+		if ok, err := path.Match(pat, base); err == nil && ok {
+			return true
+		}
+	}
+	return false
 }
 
 // LoadDocument parses (or returns the cached parse of) file f's source.

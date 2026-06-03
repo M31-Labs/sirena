@@ -19,6 +19,12 @@
 //	  when the layout engine is linked in (see RegisterLayoutComputer),
 //	  otherwise nil; err is nil.
 //
+// When geometry is required, prefer the layout.Render convenience wrapper,
+// which guarantees the engine is linked. Bare Render returns a nil layout
+// (no error) when the engine is absent — the budget-only path, and also the
+// silent footgun for a consumer who forgot to import the layout package. Use
+// LayoutLinked to detect that case.
+//
 // View pointers, including the embedded ViewDecl, are not mutated.
 package sirena
 
@@ -68,6 +74,20 @@ var layoutComputer func(rv *ResolvedView) (*LayoutResult, error)
 // directly. Passing nil clears the registration (used by tests).
 func RegisterLayoutComputer(fn func(rv *ResolvedView) (*LayoutResult, error)) {
 	layoutComputer = fn
+}
+
+// LayoutLinked reports whether the layout engine has been linked into the
+// build. The engine is linked by importing m31labs.dev/sirena/layout (a
+// blank import suffices), whose init registers it via RegisterLayoutComputer.
+//
+// When LayoutLinked is false, Render evaluates budget only and returns a nil
+// *LayoutResult — the intended budget-only path, but also the silent result a
+// consumer gets if they forgot to link the engine. Library consumers that
+// need geometry should call layout.Render (which guarantees the engine is
+// linked) or assert LayoutLinked() at startup to turn the silent nil into a
+// loud failure.
+func LayoutLinked() bool {
+	return layoutComputer != nil
 }
 
 // ErrBudgetExceeded is the sentinel returned by Render when StrictBudget
