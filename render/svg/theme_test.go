@@ -30,13 +30,32 @@ func TestTheme_UnknownName(t *testing.T) {
 	}
 }
 
-func TestTheme_AllTokensAllowlisted(t *testing.T) {
-	for _, th := range []string{"earth-default"} {
-		theme, _ := ThemeForName(th)
-		for token := range theme.Tokens {
-			if _, ok := AllowlistedTokens[token]; !ok {
-				t.Errorf("theme %q emits non-allowlisted token %s", th, token)
+// TestTheme_RegistryComplete enforces the theme contract across EVERY registered
+// theme: each must define a value for every allowlisted token (completeness) and
+// must emit nothing outside the allowlist (safety invariant 9). Iterating the
+// registry means a newly added theme (e.g. midnight) is held to the same bar
+// without touching this test.
+func TestTheme_RegistryComplete(t *testing.T) {
+	for name, theme := range themes {
+		for token := range AllowlistedTokens {
+			if _, ok := theme.Tokens[token]; !ok {
+				t.Errorf("theme %q missing a value for %s", name, token)
 			}
 		}
+		for token := range theme.Tokens {
+			if _, ok := AllowlistedTokens[token]; !ok {
+				t.Errorf("theme %q emits non-allowlisted token %s", name, token)
+			}
+		}
+	}
+}
+
+func TestTheme_Midnight(t *testing.T) {
+	th, err := ThemeForName("midnight")
+	if err != nil {
+		t.Fatalf("ThemeForName(midnight) error: %v", err)
+	}
+	if th == nil || th.Name != "midnight" {
+		t.Fatalf("midnight theme not registered correctly: %+v", th)
 	}
 }
