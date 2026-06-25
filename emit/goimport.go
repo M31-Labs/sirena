@@ -11,18 +11,38 @@
 package emit
 
 import (
+	_ "embed"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	gt "github.com/odvcencio/gotreesitter"
-	"github.com/odvcencio/gotreesitter/grammars"
 
 	"m31labs.dev/sirena"
 )
+
+//go:embed go.bin
+var goGrammarBlob []byte
+
+var (
+	goLangOnce sync.Once
+	goLang     *gt.Language
+)
+
+func goLanguage() *gt.Language {
+	goLangOnce.Do(func() {
+		lang, err := gt.LoadLanguage(goGrammarBlob)
+		if err != nil {
+			panic("sirena/emit: failed to load embedded Go grammar: " + err.Error())
+		}
+		goLang = lang
+	})
+	return goLang
+}
 
 // GoPackageGraph reads the Go module rooted at dir and returns a
 // sirena.Document whose elements are the module's packages and whose edges
@@ -40,7 +60,7 @@ func GoPackageGraph(dir string) (*sirena.Document, error) {
 		return nil, err
 	}
 
-	lang := grammars.GoLanguage()
+	lang := goLanguage()
 	parser := gt.NewParser(lang)
 
 	pkgs := map[string]*goPkg{} // keyed by import path

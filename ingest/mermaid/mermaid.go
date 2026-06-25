@@ -1,10 +1,31 @@
 package mermaid
 
 import (
+	_ "embed"
+	"sync"
+
 	gt "github.com/odvcencio/gotreesitter"
-	"github.com/odvcencio/gotreesitter/grammars"
 	"m31labs.dev/sirena"
 )
+
+//go:embed mermaid.bin
+var mermaidGrammarBlob []byte
+
+var (
+	mermaidLangOnce sync.Once
+	mermaidLang     *gt.Language
+)
+
+func mermaidLanguage() *gt.Language {
+	mermaidLangOnce.Do(func() {
+		lang, err := gt.LoadLanguage(mermaidGrammarBlob)
+		if err != nil {
+			panic("sirena/ingest/mermaid: failed to load embedded Mermaid grammar: " + err.Error())
+		}
+		mermaidLang = lang
+	})
+	return mermaidLang
+}
 
 // Options controls optional behaviour of Parse.
 type Options struct {
@@ -25,7 +46,7 @@ type Options struct {
 // and a nil document.
 func Parse(src []byte, opts Options) (*sirena.Document, []sirena.Diagnostic, error) {
 	clean, preDiags, smap := normalize(src) // Task A2: graph→flowchart, ;→space, strip styling
-	lang := grammars.MermaidLanguage()
+	lang := mermaidLanguage()
 	pool := gt.NewParserPool(lang)
 	tree, err := pool.Parse(clean)
 	if err != nil {
