@@ -18,9 +18,13 @@ type Options struct {
 	Shader   []byte
 	Material string
 	// Targets selects node identities for the shader. Empty selects all nodes.
-	Targets []string
-	Motion  bool
-	Steps   []Step
+	Targets        []string
+	Motion         bool
+	MotionStyle    string
+	MotionSpeed    *float64
+	MotionDistance *float64
+	Tour           string
+	Steps          []Step
 }
 
 // Step is an absolute keyframe. Missing fields restore the original layout,
@@ -49,6 +53,24 @@ type Timeline struct {
 // It leaves the layout and IR untouched. Scene labels retain readable node and
 // relationship text; arrowheads preserve reverse and bidirectional relations.
 func Build(lr *sirena.LayoutResult, opts Options) ([]byte, error) {
+	if opts.MotionStyle != "" && opts.MotionStyle != "spin" && opts.MotionStyle != "float" {
+		return nil, fmt.Errorf("sirena scene3d: motion style must be spin or float")
+	}
+
+	if (opts.MotionSpeed != nil || opts.MotionDistance != nil) && !opts.Motion && opts.MotionStyle == "" {
+		return nil, fmt.Errorf("sirena scene3d: motion controls require motion or a motion style")
+	}
+	for _, value := range []*float64{opts.MotionSpeed, opts.MotionDistance} {
+		if value != nil && (math.IsNaN(*value) || math.IsInf(*value, 0) || *value < 0 || *value > 100) {
+			return nil, fmt.Errorf("sirena scene3d: motion speed and distance must be finite and between 0 and 100")
+		}
+	}
+	if opts.MotionDistance != nil && opts.MotionStyle != "float" {
+		return nil, fmt.Errorf("sirena scene3d: motion distance requires float style")
+	}
+	if opts.Tour != "" && len(opts.Steps) > 0 {
+		return nil, fmt.Errorf("sirena scene3d: tour and explicit steps are mutually exclusive")
+	}
 	if len(opts.Shader) == 0 && (opts.Material != "" || len(opts.Targets) > 0) {
 		return nil, fmt.Errorf("sirena scene3d: material and targets require shader source")
 	}
@@ -120,10 +142,45 @@ func Build(lr *sirena.LayoutResult, opts Options) ([]byte, error) {
 			material = custom
 		}
 		mesh := scene.Mesh{ID: id, Geometry: geometry, Material: material, Position: point(placement.Bounds.Center())}
-		if opts.Motion {
-			mesh.Spin = scene.Euler{Y: .18}
+
+		if opts.Motion || opts.MotionStyle != "" {
+			speed := .18
+			if opts.MotionStyle == "float" {
+				speed = .7
+			}
+			if opts.MotionSpeed != nil {
+				speed = *opts.MotionSpeed
+			}
+			if speed > 0 {
+				if opts.MotionStyle == "float" {
+					distance := .1
+					if opts.MotionDistance != nil {
+						distance = *opts.MotionDistance
+					}
+					if distance > 0 {
+						mesh.Drift = scene.Vec3(0, distance, 0)
+						mesh.DriftSpeed = speed
+						mesh.DriftPhase = float64(len(nodes)) * .2
+					}
+				} else {
+					mesh.Spin = scene.Euler{Y: speed}
+				}
+			}
 		}
+
 		if err := emit(mesh, scene.Label{ID: "label:" + id, Target: id, Text: elementLabel(n), Shift: scene.Vec3(0, -height*.65, .5), Color: "#edf8f5", Background: "#101923", Font: "600 16px sans-serif", Collision: "shift"}); err != nil {
+			return nil, err
+		}
+	}
+	for _, line := range lr.Lifelines {
+		if line.Actor == nil {
+			return nil, fmt.Errorf("sirena scene3d: lifeline has no actor")
+		}
+		id := "lifeline:" + identity(line.Actor)
+		if err := add(id); err != nil {
+			return nil, err
+		}
+		if err := emit(scene.Mesh{ID: id, Geometry: scene.LinesGeometry{Points: []scene.Vector3{point(line.From), point(line.To)}, Segments: [][2]int{{0, 1}}, Width: 1}, Material: scene.StandardMaterial{Color: "#3e5362", Emissive: 1}}); err != nil {
 			return nil, err
 		}
 	}
@@ -229,7 +286,7 @@ func Build(lr *sirena.LayoutResult, opts Options) ([]byte, error) {
 			}
 		}
 	}
-	props := scene.Props{AriaLabel: "Sirena diagram", Background: "transparent", CanvasAlpha: scene.Bool(true), Responsive: scene.Bool(true), FillHeight: scene.Bool(true), DragToRotate: scene.Bool(true), MaxFrameRate: 30, MaxDevicePixelRatio: 1.5, MaxPixels: 2_000_000, AdaptiveQuality: scene.Bool(true), Camera: scene.PerspectiveCamera{Position: scene.Vec3(0, 0, 11), FOV: 50, Near: .1, Far: 100}, Environment: scene.Environment{AmbientIntensity: .85}, Graph: scene.NewGraph(nodes...)}
+	props := scene.Props{AriaLabel: "Sirena diagram", Background: "transparent", CanvasAlpha: scene.Bool(true), Responsive: scene.Bool(true), FillHeight: scene.Bool(true), DragToRotate: scene.Bool(lr.Diagram != "sequence"), MaxFrameRate: 30, MaxDevicePixelRatio: 1.5, MaxPixels: 2_000_000, AdaptiveQuality: scene.Bool(true), Camera: scene.PerspectiveCamera{Position: scene.Vec3(0, 0, 11), FOV: 50, Near: .1, Far: 100}, Environment: scene.Environment{AmbientIntensity: .85}, Graph: scene.NewGraph(nodes...)}
 	var payload map[string]any
 	if err := json.Unmarshal(props.EngineConfig().Props, &payload); err != nil {
 		return nil, err
@@ -238,6 +295,24 @@ func Build(lr *sirena.LayoutResult, opts Options) ([]byte, error) {
 		timeline, err := buildTimeline(props.SceneIR(), opts.Steps)
 		if err != nil {
 			return nil, err
+		}
+		payload["slideSteps"] = timeline
+	}
+	if opts.Tour != "" {
+		steps, err := tourSteps(lr, opts.Tour)
+		if err != nil {
+			return nil, err
+		}
+		timeline, err := buildTimeline(props.SceneIR(), steps)
+		if err != nil {
+			return nil, err
+		}
+		encoded, err := json.Marshal(timeline)
+		if err != nil {
+			return nil, err
+		}
+		if len(encoded) > 4<<20 {
+			return nil, fmt.Errorf("sirena scene3d: tour exceeds 4 MiB; select a smaller view")
 		}
 		payload["slideSteps"] = timeline
 	}

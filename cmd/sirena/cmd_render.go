@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -38,15 +39,64 @@ func RunRender(args []string, stdout, stderr io.Writer) int {
 	shaderTargets := fs.String("targets", "", "comma-separated shader node identities")
 	motion := fs.Bool("motion", false, "slow node rotation (requires --scene3d)")
 	stepsPath := fs.String("steps", "", "absolute presentation keyframes JSON (requires --scene3d)")
+	diagram := fs.String("diagram", "", "diagram geometry: architecture, sequence, or radial")
+	tour := fs.String("tour", "", "generate presentation steps: nodes or relationships (requires --scene3d)")
+	motionSpeed := fs.Float64("motion-speed", -1, "spin or float speed in radians/second")
+	motionDistance := fs.Float64("motion-distance", -1, "float amplitude in world units")
+	motionStyle := fs.String("motion-style", "", "native motion: spin or float (requires --scene3d)")
 	infer := fs.Bool("infer", false, "promote Mermaid shapes/labels to typed sirena kinds")
 	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	var speed, distance *float64
+	bad := false
+	fs.Visit(func(flag *flag.Flag) {
+		switch flag.Name {
+		case "motion-speed":
+			speed = motionSpeed
+		case "motion-distance":
+			distance = motionDistance
+		}
+	})
+	for _, value := range []*float64{speed, distance} {
+		if value != nil && (math.IsNaN(*value) || math.IsInf(*value, 0) || *value < 0 || *value > 100) {
+			bad = true
+		}
+	}
+	if bad {
+		fmt.Fprintln(stderr, "motion speed and distance must be finite and between 0 and 100")
+		return 2
+	}
+	if (speed != nil || distance != nil) && (!*scene3D || (!*motion && *motionStyle == "")) {
+		fmt.Fprintln(stderr, "motion controls require --scene3d and --motion or --motion-style")
+		return 2
+	}
+	if distance != nil && *motionStyle != "float" {
+		fmt.Fprintln(stderr, "--motion-distance requires --motion-style float")
+		return 2
+	}
+
+	if *diagram != "" && !sirena.ValidDiagram(*diagram) {
+		fmt.Fprintln(stderr, "--diagram must be architecture, sequence, or radial")
+		return 2
+	}
+	if *tour != "" && *tour != "nodes" && *tour != "relationships" {
+		fmt.Fprintln(stderr, "--tour must be nodes or relationships")
+		return 2
+	}
+	if *tour != "" && *stepsPath != "" {
+		fmt.Fprintln(stderr, "--tour and --steps are mutually exclusive")
+		return 2
+	}
+	if *motionStyle != "" && *motionStyle != "spin" && *motionStyle != "float" {
+		fmt.Fprintln(stderr, "--motion-style must be spin or float")
 		return 2
 	}
 	if fs.NArg() != 1 {
 		fmt.Fprintln(stderr, "usage: sirena render [-o out.svg] [--theme name] [--strict-budget] [--from mermaid|sirena] [--infer] <view-or-system>")
 		return 2
 	}
-	if !*scene3D && (*shaderPath != "" || *material != "" || *shaderTargets != "" || *motion || *stepsPath != "") {
+	if !*scene3D && (*shaderPath != "" || *material != "" || *shaderTargets != "" || *motion || *stepsPath != "" || *tour != "" || *motionStyle != "") {
 		fmt.Fprintln(stderr, "Scene3D options require --scene3d")
 		return 2
 	}
@@ -73,13 +123,13 @@ func RunRender(args []string, stdout, stderr io.Writer) int {
 		svgBytes []byte
 	)
 	if *scene3D {
-		svgBytes, code = renderScene3D(target, format, *infer, *strict, *shaderPath, *material, *shaderTargets, *motion, *stepsPath, stderr)
+		svgBytes, code = renderScene3D(target, format, *infer, *strict, *shaderPath, *material, *shaderTargets, *motion, *stepsPath, stderr, *diagram, *tour, *motionStyle, motionControls{Speed: speed, Distance: distance})
 	} else {
 		switch format {
 		case "mermaid":
-			svgBytes, code = renderMermaid(target, *infer, *strict, theme, stderr)
+			svgBytes, code = renderMermaid(target, *infer, *strict, theme, stderr, *diagram)
 		case "sirena":
-			svgBytes, code = renderSirena(target, *strict, theme, stderr)
+			svgBytes, code = renderSirena(target, *strict, theme, stderr, *diagram)
 		}
 	}
 	if code != 0 {
@@ -129,7 +179,7 @@ func resolveFormat(target, from string, stderr io.Writer) (string, int) {
 }
 
 // renderMermaid ingests a Mermaid file and renders it to SVG bytes.
-func renderMermaid(target string, infer bool, strict bool, theme *svg.Theme, stderr io.Writer) ([]byte, int) {
+func renderMermaid(target string, infer bool, strict bool, theme *svg.Theme, stderr io.Writer, diagram ...string) ([]byte, int) {
 	src, err := os.ReadFile(target)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
@@ -154,7 +204,7 @@ func renderMermaid(target string, infer bool, strict bool, theme *svg.Theme, std
 	}
 
 	rv := sirena.AllElementsView(doc)
-	lr, report, rerr := sirena.Render(rv, sirena.RenderOptions{StrictBudget: strict})
+	lr, report, rerr := sirena.Render(rv, sirena.RenderOptions{StrictBudget: strict, Diagram: firstDiagram(diagram)})
 	if errors.Is(rerr, sirena.ErrBudgetExceeded) {
 		fmt.Fprintln(stderr, "SIR-RENDER-BUDGET-EXCEEDED: view exceeds its declared budget")
 		printBudget(stderr, report)
@@ -178,13 +228,13 @@ func renderMermaid(target string, infer bool, strict bool, theme *svg.Theme, std
 }
 
 // renderSirena loads and renders a .sir or .view.sir file via the existing path.
-func renderSirena(target string, strict bool, theme *svg.Theme, stderr io.Writer) ([]byte, int) {
+func renderSirena(target string, strict bool, theme *svg.Theme, stderr io.Writer, diagram ...string) ([]byte, int) {
 	rv, code := resolveRenderView(target, stderr)
 	if code != 0 {
 		return nil, code
 	}
 
-	lr, report, err := sirena.Render(rv, sirena.RenderOptions{StrictBudget: strict})
+	lr, report, err := sirena.Render(rv, sirena.RenderOptions{StrictBudget: strict, Diagram: firstDiagram(diagram)})
 	if errors.Is(err, sirena.ErrBudgetExceeded) {
 		fmt.Fprintln(stderr, "SIR-RENDER-BUDGET-EXCEEDED: view exceeds its declared budget")
 		printBudget(stderr, report)
@@ -249,4 +299,11 @@ func printBudget(w io.Writer, report *sirena.BudgetReport) {
 	for _, b := range report.Breaches {
 		fmt.Fprintf(w, "  %s: %d over limit %d\n", b.Field, b.Actual, b.Limit)
 	}
+}
+
+func firstDiagram(values []string) string {
+	if len(values) > 0 {
+		return values[0]
+	}
+	return ""
 }

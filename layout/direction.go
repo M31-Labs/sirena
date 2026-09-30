@@ -47,7 +47,7 @@ func layoutDirectedCell(items []cellItem, edges []*sirena.Edge, metrics Metrics,
 		}
 	}
 	for _, node := range nodes {
-		node.Bounds = transform(node.Bounds, node.Node.Name)
+		node.Bounds = transform(node.Bounds, node.Node.DisplayLabel())
 		include(node.Bounds)
 	}
 	for _, summary := range summaries {

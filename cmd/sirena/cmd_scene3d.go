@@ -13,7 +13,7 @@ import (
 	"m31labs.dev/sirena/render/scene3d"
 )
 
-func renderScene3D(target, format string, infer, strict bool, shaderPath, material, targets string, motion bool, stepsPath string, stderr io.Writer) ([]byte, int) {
+func renderScene3D(target, format string, infer, strict bool, shaderPath, material, targets string, motion bool, stepsPath string, stderr io.Writer, diagram, tour, motionStyle string, controls motionControls) ([]byte, int) {
 	var rv *sirena.ResolvedView
 	if format == "sirena" {
 		var code int
@@ -37,7 +37,7 @@ func renderScene3D(target, format string, infer, strict bool, shaderPath, materi
 		}
 		rv = sirena.AllElementsView(doc)
 	}
-	lr, report, err := sirena.Render(rv, sirena.RenderOptions{StrictBudget: strict})
+	lr, report, err := sirena.Render(rv, sirena.RenderOptions{StrictBudget: strict, Diagram: diagram})
 	if report != nil {
 		printBudget(stderr, report)
 	}
@@ -46,6 +46,11 @@ func renderScene3D(target, format string, infer, strict bool, shaderPath, materi
 		return nil, 1
 	}
 	opts := scene3d.Options{Material: material, Motion: motion}
+	opts.Tour = tour
+	opts.MotionStyle = motionStyle
+	opts.MotionSpeed = controls.Speed
+	opts.MotionDistance = controls.Distance
+
 	for _, id := range strings.Split(targets, ",") {
 		if id = strings.TrimSpace(id); id != "" {
 			opts.Targets = append(opts.Targets, id)
@@ -87,3 +92,5 @@ func renderScene3D(target, format string, infer, strict bool, shaderPath, materi
 	}
 	return out, 0
 }
+
+type motionControls struct{ Speed, Distance *float64 }

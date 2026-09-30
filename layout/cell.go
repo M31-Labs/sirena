@@ -22,7 +22,7 @@ func (c cellItem) name() string {
 
 func (c cellItem) label() string {
 	if c.element != nil {
-		return c.element.Name
+		return c.element.DisplayLabel()
 	}
 	if c.summary != nil {
 		return c.summary.Label

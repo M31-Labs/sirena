@@ -1,0 +1,8 @@
+client browser { label: "Browser" }
+service api { label: "API" }
+database db { label: "Storage" }
+browser -> api: calls "GET /orders"
+api -> api: calls "Validate token"
+api -> db: reads "Load orders"
+db -> api: flow "Order rows"
+api -> browser: flow "200 OK"

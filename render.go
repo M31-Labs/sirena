@@ -36,6 +36,9 @@ type RenderOptions struct {
 	// over budget. Permissive mode (the zero value) still surfaces the
 	// report so callers can warn, but does not abort.
 	StrictBudget bool
+	// Diagram selects architecture (default), sequence, or radial geometry.
+	// Empty preserves the view's layout { diagram: ... } hint.
+	Diagram string
 }
 
 // LayoutResult is the positioned IR: the resolved view plus the absolute
@@ -43,6 +46,8 @@ type RenderOptions struct {
 // and edge. The geometric value types live in geometry.go; the layout
 // algorithms that fill these slices live in m31labs.dev/sirena/layout.
 type LayoutResult struct {
+	Diagram   string
+	Lifelines []LifelinePlacement
 	// View is the resolved view this layout was computed from.
 	View *ResolvedView
 	// Bounds is the overall canvas bounding box enclosing every
@@ -107,6 +112,12 @@ var ErrBudgetExceeded = errors.New("sirena: view budget exceeded; see BudgetRepo
 //   - When no layout engine is linked, returns (nil, report, nil) so
 //     budget-only callers still work.
 func Render(rv *ResolvedView, opts RenderOptions) (*LayoutResult, *BudgetReport, error) {
+	if opts.Diagram != "" {
+		if !ValidDiagram(opts.Diagram) {
+			return nil, nil, errors.New("sirena: diagram must be architecture, sequence, or radial")
+		}
+		rv = WithDiagram(rv, opts.Diagram)
+	}
 	report := EvaluateBudget(rv)
 	if report != nil && opts.StrictBudget {
 		return nil, report, ErrBudgetExceeded

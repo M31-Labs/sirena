@@ -1,6 +1,9 @@
 package layout
 
-import "m31labs.dev/sirena"
+import (
+	"fmt"
+	"m31labs.dev/sirena"
+)
 
 // init wires this package's Compute into the root sirena.Render
 // entrypoint. The root package cannot import layout (cycle), so it
@@ -77,6 +80,16 @@ func Compute(rv *sirena.ResolvedView, opts LayoutOptions) (*sirena.LayoutResult,
 	}
 
 	metrics := DefaultMetrics()
+	diagram := sirena.DiagramName(rv)
+	if !sirena.ValidDiagram(diagram) {
+		return nil, fmt.Errorf("sirena: unknown diagram %q (want architecture, sequence, or radial)", diagram)
+	}
+	if diagram == "sequence" {
+		return computeSequence(rv, seed, metrics)
+	}
+	if diagram == "radial" {
+		return computeRadial(rv, seed, metrics)
+	}
 
 	// The force preset skips the cell/skeleton pipeline entirely.
 	if opts.Preset == LayoutPresetForce {
@@ -192,11 +205,10 @@ func Compute(rv *sirena.ResolvedView, opts LayoutOptions) (*sirena.LayoutResult,
 	return lr, nil
 }
 
-// nodeWidth is the placeholder text-measurement function: it estimates a
-// node's width from its label length. Phase F replaces it with the
-// bundled font's real advance widths.
+// nodeWidth uses the same bundled glyph advances as SVG labels, with room
+// between the text and the node border.
 func nodeWidth(label string) float64 {
-	w := defaultGlyphWidth * float64(len([]rune(label)))
+	w := labelWidth(label) + 24
 	if w < defaultNodeMinW {
 		return defaultNodeMinW
 	}

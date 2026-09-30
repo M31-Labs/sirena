@@ -2,9 +2,13 @@ package svg
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/json"
 	"fmt"
+	"html"
 	"sort"
 	"strconv"
+	"strings"
 
 	"m31labs.dev/sirena"
 	"m31labs.dev/sirena/render/svg/font"
@@ -39,12 +43,14 @@ func Render(lr *sirena.LayoutResult, theme *Theme) ([]byte, error) {
 
 	var b bytes.Buffer
 	b.WriteString(`<?xml version="1.0" encoding="UTF-8"?>` + "\n")
-	fmt.Fprintf(&b, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="%s %s %s %s" width="%s" height="%s">`+"\n",
-		num(vbX), num(vbY), num(w), num(h), num(w), num(h))
+	fmt.Fprintf(&b, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="%s %s %s %s" width="%s" height="%s" data-sirena-theme="%s">`+"\n",
+		num(vbX), num(vbY), num(w), num(h), num(w), num(h), themeScope(theme))
 	writeStyle(&b, theme)
+	fmt.Fprintf(&b, `<defs><marker id="sirena-arrow-%s" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="var(--sirena-edge-stroke-flow)"/></marker></defs>`, themeScope(theme))
 
+	writeLifelines(&b, lr.Lifelines)
 	writeBoundaries(&b, lr.BoundaryPlacements)
-	writeEdges(&b, lr.EdgeRoutes)
+	writeEdges(&b, lr.EdgeRoutes, "sirena-arrow-"+themeScope(theme))
 	writeNodes(&b, lr.NodePlacements)
 	writeSummaries(&b, lr.SummaryPlacements)
 
@@ -56,8 +62,8 @@ func Render(lr *sirena.LayoutResult, theme *Theme) ([]byte, error) {
 // fixed class-rule set.
 func writeStyle(b *bytes.Buffer, theme *Theme) {
 	b.WriteString("<style>\n")
-	b.WriteString("svg { background: var(--sirena-bg); }\n")
-	b.WriteString(":root {\n")
+	selector := `svg[data-sirena-theme="` + themeScope(theme) + `"]`
+	b.WriteString(selector + " { background: var(--sirena-bg);\n")
 	names := make([]string, 0, len(theme.Tokens))
 	for k := range theme.Tokens {
 		names = append(names, k)
@@ -67,7 +73,11 @@ func writeStyle(b *bytes.Buffer, theme *Theme) {
 		fmt.Fprintf(b, "  %s: %s;\n", k, escapeText(theme.Tokens[k]))
 	}
 	b.WriteString("}\n")
-	b.WriteString(classRules)
+	for _, line := range strings.Split(classRules, "\n") {
+		if strings.TrimSpace(line) != "" {
+			b.WriteString(selector + " " + line + "\n")
+		}
+	}
 	b.WriteString("</style>\n")
 }
 
@@ -76,6 +86,12 @@ func writeStyle(b *bytes.Buffer, theme *Theme) {
 type boundaryAtDepth struct {
 	bp    *sirena.BoundaryPlacement
 	depth int
+}
+
+func writeLifelines(b *bytes.Buffer, lines []sirena.LifelinePlacement) {
+	for _, line := range lines {
+		fmt.Fprintf(b, `<path class="lifeline" d="M%s %sL%s %s" fill="none" stroke="var(--sirena-stroke)" stroke-width="1" stroke-dasharray="4 5"/>`, num(line.From.X), num(line.From.Y), num(line.To.X), num(line.To.Y))
+	}
 }
 
 func writeBoundaries(b *bytes.Buffer, bps []*sirena.BoundaryPlacement) {
@@ -104,7 +120,7 @@ func writeBoundaries(b *bytes.Buffer, bps []*sirena.BoundaryPlacement) {
 		name := "region"
 		if f.bp.Boundary != nil {
 			kind = "kind-" + f.bp.Boundary.Kind.String()
-			name = f.bp.Boundary.Name
+			name = f.bp.Boundary.DisplayLabel()
 		}
 		r := f.bp.Bounds
 		fmt.Fprintf(b, `<g class="boundary %s">`, kind)
@@ -124,7 +140,7 @@ func writeNodes(b *bytes.Buffer, nps []*sirena.NodePlacement) {
 		name := ""
 		if np.Node != nil {
 			kind = "kind-" + np.Node.Kind.String()
-			name = np.Node.Name
+			name = np.Node.DisplayLabel()
 		}
 		r := np.Bounds
 		fmt.Fprintf(b, `<g class="node %s">`, kind)
@@ -152,7 +168,7 @@ func writeSummaries(b *bytes.Buffer, sps []*sirena.SummaryPlacement) {
 	}
 }
 
-func writeEdges(b *bytes.Buffer, routes []*sirena.EdgeRoute) {
+func writeEdges(b *bytes.Buffer, routes []*sirena.EdgeRoute, marker string) {
 	sorted := append([]*sirena.EdgeRoute(nil), routes...)
 	sort.SliceStable(sorted, func(i, j int) bool { return edgeRouteLess(sorted[i], sorted[j]) })
 	for _, er := range sorted {
@@ -164,7 +180,16 @@ func writeEdges(b *bytes.Buffer, routes []*sirena.EdgeRoute) {
 			kind = "kind-" + er.Edge.Kind.String()
 		}
 		fmt.Fprintf(b, `<g class="edge %s">`, kind)
-		b.WriteString(`<path d="`)
+		b.WriteString(`<path`)
+		if er.Edge != nil {
+			if er.Edge.Direction == sirena.DirForward || er.Edge.Direction == sirena.DirBidirectional {
+				fmt.Fprintf(b, ` marker-end="url(#%s)"`, marker)
+			}
+			if er.Edge.Direction == sirena.DirReverse || er.Edge.Direction == sirena.DirBidirectional {
+				fmt.Fprintf(b, ` marker-start="url(#%s)"`, marker)
+			}
+		}
+		b.WriteString(` d="`)
 		for i, p := range er.Points {
 			cmd := "L"
 			if i == 0 {
@@ -195,7 +220,7 @@ func writeLabel(b *bytes.Buffer, text string, center sirena.Point) {
 	penX := center.X - textW/2
 	baseline := center.Y + labelSize*0.32 // approximate vertical centering
 
-	b.WriteString(`<g class="label">`)
+	fmt.Fprintf(b, `<g class="label" role="img" aria-label="%s"><title>%s</title>`, html.EscapeString(text), html.EscapeString(text))
 	for _, r := range text {
 		g := font.Lookup(r)
 		if g.Path != "" {
@@ -268,3 +293,9 @@ const classRules = `.boundary rect { fill: none; stroke: var(--sirena-stroke); s
 .edge.kind-depends_on path { stroke: var(--sirena-edge-stroke-depends-on); }
 .label path { fill: var(--sirena-label-fill); stroke: none; }
 `
+
+func themeScope(theme *Theme) string {
+	data, _ := json.Marshal(theme.Tokens)
+	sum := sha256.Sum256(data)
+	return fmt.Sprintf("%x", sum[:8])
+}
