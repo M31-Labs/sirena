@@ -58,3 +58,25 @@ func TestViewportIncludesExternalRelationshipCaption(t *testing.T) {
 		t.Fatal("viewport calculation mutated the source layout")
 	}
 }
+
+func TestDirectionalMarkersUseRelationshipTokens(t *testing.T) {
+	var routes []*sirena.EdgeRoute
+	for kind := sirena.EdgeKindCalls; kind <= sirena.EdgeKindFlow; kind++ {
+		routes = append(routes, &sirena.EdgeRoute{Edge: &sirena.Edge{Kind: kind, Direction: sirena.DirBidirectional}, Points: []sirena.Point{{}, {X: 100}}})
+	}
+	theme, _ := ThemeForName(DefaultThemeName)
+	data, err := Render(&sirena.LayoutResult{Bounds: sirena.Rect{Max: sirena.Point{X: 100, Y: 100}}, EdgeRoutes: routes}, theme)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(data)
+	for kind := sirena.EdgeKindCalls; kind <= sirena.EdgeKindFlow; kind++ {
+		name := kind.String()
+		if !strings.Contains(s, `-`+name+`" viewBox=`) || !strings.Contains(s, `fill="var(--sirena-edge-stroke-`+strings.ReplaceAll(name, "_", "-")+`)"`) || strings.Count(s, `url(#sirena-arrow-`+themeScope(theme)+`-`+name+`)`) != 2 {
+			t.Fatalf("relationship %s lacks matching start/end marker tokens", name)
+		}
+	}
+	if strings.Contains(s, ".edge.kind-reads path {") {
+		t.Fatal("relationship stroke rules leak into caption glyph paths")
+	}
+}

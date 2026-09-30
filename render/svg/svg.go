@@ -47,11 +47,12 @@ func Render(lr *sirena.LayoutResult, theme *Theme) ([]byte, error) {
 	fmt.Fprintf(&b, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="%s %s %s %s" width="%s" height="%s" data-sirena-theme="%s">`+"\n",
 		num(vbX), num(vbY), num(w), num(h), num(w), num(h), themeScope(theme))
 	writeStyle(&b, theme)
-	fmt.Fprintf(&b, `<defs><marker id="sirena-arrow-%s" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="var(--sirena-edge-stroke-flow)"/></marker></defs>`, themeScope(theme))
+	markerPrefix := "sirena-arrow-" + themeScope(theme)
+	writeMarkers(&b, lr.EdgeRoutes, markerPrefix)
 
 	writeLifelines(&b, lr.Lifelines)
 	writeBoundaries(&b, lr.BoundaryPlacements)
-	writeEdges(&b, lr.EdgeRoutes, "sirena-arrow-"+themeScope(theme))
+	writeEdges(&b, lr.EdgeRoutes, markerPrefix)
 	writeNodes(&b, lr.NodePlacements)
 	writeSummaries(&b, lr.SummaryPlacements)
 
@@ -207,11 +208,12 @@ func writeEdges(b *bytes.Buffer, routes []*sirena.EdgeRoute, marker string) {
 		fmt.Fprintf(b, `<g class="edge %s">`, kind)
 		b.WriteString(`<path`)
 		if er.Edge != nil {
+			markerID := marker + "-" + edgeMarkerKind(er.Edge)
 			if er.Edge.Direction == sirena.DirForward || er.Edge.Direction == sirena.DirBidirectional {
-				fmt.Fprintf(b, ` marker-end="url(#%s)"`, marker)
+				fmt.Fprintf(b, ` marker-end="url(#%s)"`, markerID)
 			}
 			if er.Edge.Direction == sirena.DirReverse || er.Edge.Direction == sirena.DirBidirectional {
-				fmt.Fprintf(b, ` marker-start="url(#%s)"`, marker)
+				fmt.Fprintf(b, ` marker-start="url(#%s)"`, markerID)
 			}
 		}
 		b.WriteString(` d="`)
@@ -228,6 +230,33 @@ func writeEdges(b *bytes.Buffer, routes []*sirena.EdgeRoute, marker string) {
 		}
 		b.WriteString("</g>\n")
 	}
+}
+
+func edgeMarkerKind(edge *sirena.Edge) string {
+	if edge == nil || edge.Kind < sirena.EdgeKindCalls || edge.Kind > sirena.EdgeKindFlow {
+		return "flow"
+	}
+	return edge.Kind.String()
+}
+
+func writeMarkers(b *bytes.Buffer, routes []*sirena.EdgeRoute, prefix string) {
+	used := map[string]bool{}
+	for _, route := range routes {
+		if route != nil && route.Edge != nil && len(route.Points) >= 2 {
+			used[edgeMarkerKind(route.Edge)] = true
+		}
+	}
+	kinds := make([]string, 0, len(used))
+	for kind := range used {
+		kinds = append(kinds, kind)
+	}
+	sort.Strings(kinds)
+	b.WriteString("<defs>")
+	for _, kind := range kinds {
+		token := strings.ReplaceAll(kind, "_", "-")
+		fmt.Fprintf(b, `<marker id="%s-%s" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="var(--sirena-edge-stroke-%s)"/></marker>`, prefix, kind, token)
+	}
+	b.WriteString("</defs>")
 }
 
 // writeLabel emits a label as a group of glyph <path> elements centered
@@ -309,13 +338,13 @@ const classRules = `.boundary rect { fill: none; stroke: var(--sirena-stroke); s
 .node.kind-gateway rect { fill: var(--sirena-element-fill-gateway); }
 .node.kind-node rect { fill: var(--sirena-element-fill-node); }
 .summary rect { fill: var(--sirena-element-fill-node); stroke: var(--sirena-stroke-strong); stroke-width: 1.5; stroke-dasharray: 2 2; }
-.edge path { fill: none; stroke: var(--sirena-edge-stroke-flow); stroke-width: 1.5; }
-.edge.kind-calls path { stroke: var(--sirena-edge-stroke-calls); }
-.edge.kind-reads path { stroke: var(--sirena-edge-stroke-reads); }
-.edge.kind-writes path { stroke: var(--sirena-edge-stroke-writes); }
-.edge.kind-publishes path { stroke: var(--sirena-edge-stroke-publishes); }
-.edge.kind-subscribes path { stroke: var(--sirena-edge-stroke-subscribes); }
-.edge.kind-depends_on path { stroke: var(--sirena-edge-stroke-depends-on); }
+.edge > path { fill: none; stroke: var(--sirena-edge-stroke-flow); stroke-width: 1.5; }
+.edge.kind-calls > path { stroke: var(--sirena-edge-stroke-calls); }
+.edge.kind-reads > path { stroke: var(--sirena-edge-stroke-reads); }
+.edge.kind-writes > path { stroke: var(--sirena-edge-stroke-writes); }
+.edge.kind-publishes > path { stroke: var(--sirena-edge-stroke-publishes); }
+.edge.kind-subscribes > path { stroke: var(--sirena-edge-stroke-subscribes); }
+.edge.kind-depends_on > path { stroke: var(--sirena-edge-stroke-depends-on); }
 .label path { fill: var(--sirena-label-fill); stroke: none; }
 `
 
