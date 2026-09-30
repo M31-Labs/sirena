@@ -450,6 +450,8 @@ func buildTimeline(ir scene.SceneIR, steps []Step) (Timeline, error) {
 				sz *= *patch.Scale
 			}
 			frame.Commands = append(frame.Commands, scene.Command{Kind: scene.CommandSetTransform, ObjectID: id, Data: map[string]any{"x": x, "y": y, "z": z, "rotationX": obj.RotationX, "rotationY": obj.RotationY, "rotationZ": obj.RotationZ, "scaleX": sx, "scaleY": sy, "scaleZ": sz}})
+			// Labels are separate projected objects. Every visible frame recreates
+			// the original label, including a reveal after a hidden frame.
 			if label, ok := labels["label:"+id]; ok {
 				label.X += x - obj.X
 				label.Y += y - obj.Y

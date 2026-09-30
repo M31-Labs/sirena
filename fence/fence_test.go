@@ -36,6 +36,22 @@ func TestRender_InlineSynthView(t *testing.T) {
 	}
 }
 
+func TestRender_ClassDiagram(t *testing.T) {
+	src := []byte(`service order { label: "Order" fields: "id: UUID; total: Money" methods: "submit(); cancel()" }`)
+	res, err := Render(src, Options{Diagram: "class"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, text := range []string{"Order", "id: UUID", "total: Money", "submit()", "cancel()"} {
+		if !strings.Contains(string(res.SVG), text) {
+			t.Errorf("class fence omitted compartment text %q", text)
+		}
+	}
+	if _, err := Render(src, Options{Diagram: "unknown"}); err == nil {
+		t.Fatal("invalid fence diagram accepted")
+	}
+}
+
 // TestRender_Interactive returns the sentinel until the island path ships.
 func TestRender_Interactive(t *testing.T) {
 	_, err := Render([]byte("service api\n"), Options{Interactive: true})

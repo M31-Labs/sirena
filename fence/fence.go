@@ -46,6 +46,8 @@ type Options struct {
 	ViewRef string
 	// Theme is the SVG theme name; empty selects the default theme.
 	Theme string
+	// Diagram selects the diagram family; empty preserves the view's layout hint.
+	Diagram string
 	// Interactive requests a GoSX island payload alongside the SVG. Not yet
 	// available — Render returns ErrInteractiveNotAvailable.
 	Interactive bool
@@ -119,7 +121,7 @@ func Render(src []byte, opts Options) (Result, error) {
 		return result, nil
 	}
 
-	lr, report, rerr := sirena.Render(rv, sirena.RenderOptions{StrictBudget: opts.StrictBudget})
+	lr, report, rerr := sirena.Render(rv, sirena.RenderOptions{Diagram: opts.Diagram, StrictBudget: opts.StrictBudget})
 	result.BudgetReport = report
 	if report != nil && len(report.Breaches) > 0 {
 		result.Diagnostics = append(result.Diagnostics, sirena.Diagnostic{
