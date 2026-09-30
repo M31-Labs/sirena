@@ -1,0 +1,8 @@
+material Pearl {
+    param violet : color = rgb(0.46, 0.32, 0.95)
+    param mint : color = rgb(0.32, 0.91, 0.73)
+    surface(geo) -> color {
+        let stripe = sin(geo.uv.y * 40.0 + geo.uv.x * 10.0) * 0.5 + 0.5
+        return mix(violet, mint, stripe)
+    }
+}

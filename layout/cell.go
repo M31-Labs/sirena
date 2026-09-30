@@ -114,7 +114,7 @@ func layoutBoundary(b *sirena.Boundary, rv *sirena.ResolvedView, included map[*s
 			items = append(items, cellItem{element: e})
 		}
 	}
-	nps, sps, cellBounds := layoutCell(items, rv.Edges, metrics)
+	nps, sps, cellBounds := layoutDirectedCell(items, rv.Edges, metrics, rv)
 
 	var childBPs []*sirena.BoundaryPlacement
 	yCursor := 0.0

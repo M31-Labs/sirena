@@ -114,7 +114,7 @@ func Compute(rv *sirena.ResolvedView, opts LayoutOptions) (*sirena.LayoutResult,
 	for _, s := range rv.Summaries {
 		items = append(items, cellItem{summary: s})
 	}
-	looseNps, looseSps, looseBounds := layoutCell(items, rv.Edges, metrics)
+	looseNps, looseSps, looseBounds := layoutDirectedCell(items, rv.Edges, metrics, rv)
 
 	// Each top-level region — the implicit loose region (nil boundary)
 	// plus every top-level boundary — is laid out at its own local origin,

@@ -12,6 +12,8 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, `sirena - diagram language toolchain
 
 Usage:
+  sirena render --scene3d [--shader f.sel] [--targets ids] [--motion] [--steps f.json] [-o scene.json] <file>
+                                         Export a native GoSX scene with optional material and keyframes
   sirena parse [--json] <file>             Parse and dump the IR
   sirena fmt [-w] [--check] <file>...      Format files
   sirena lint <workspace-or-file>          Run lint rules
