@@ -65,3 +65,5 @@ Run `sirena render --help` to discover every control. Node labels have collision
 priority over relationship captions and follow native float motion. Native labels
 use a single line capped at 320 pixels; choose concise labels and smaller views
 for presentation-sized diagrams. GoSX respects reduced-motion preferences.
+Boundary headers reserve space above their children, and SVG viewports include
+routed relationships and measured captions to prevent clipping.

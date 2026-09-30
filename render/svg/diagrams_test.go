@@ -47,3 +47,14 @@ func TestThemeScopesFollowTokenContents(t *testing.T) {
 		t.Fatal("same tokens have nondeterministic scope")
 	}
 }
+
+func TestViewportIncludesExternalRelationshipCaption(t *testing.T) {
+	lr := &sirena.LayoutResult{Bounds: sirena.Rect{Max: sirena.Point{X: 60, Y: 40}}, EdgeRoutes: []*sirena.EdgeRoute{{Points: []sirena.Point{{X: 0, Y: 0}, {X: 200, Y: 100}}, Label: &sirena.EdgeLabel{Anchor: sirena.Point{X: -100, Y: -40}, Text: "A relationship caption outside the node boxes"}}}}
+	bounds := svgBounds(lr)
+	if bounds.Min.X >= -100 || bounds.Min.Y >= -40 || bounds.Max.X < 200 || bounds.Max.Y < 100 {
+		t.Fatalf("routed geometry or caption is clipped: %+v", bounds)
+	}
+	if lr.Bounds.Max.X != 60 || lr.Bounds.Min.X != 0 {
+		t.Fatal("viewport calculation mutated the source layout")
+	}
+}

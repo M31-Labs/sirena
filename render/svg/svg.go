@@ -36,10 +36,11 @@ func Render(lr *sirena.LayoutResult, theme *Theme) ([]byte, error) {
 		theme = t
 	}
 
-	vbX := lr.Bounds.Min.X - canvasMargin
-	vbY := lr.Bounds.Min.Y - canvasMargin
-	w := lr.Bounds.Width() + 2*canvasMargin
-	h := lr.Bounds.Height() + 2*canvasMargin
+	bounds := svgBounds(lr)
+	vbX := bounds.Min.X - canvasMargin
+	vbY := bounds.Min.Y - canvasMargin
+	w := bounds.Width() + 2*canvasMargin
+	h := bounds.Height() + 2*canvasMargin
 
 	var b bytes.Buffer
 	b.WriteString(`<?xml version="1.0" encoding="UTF-8"?>` + "\n")
@@ -56,6 +57,30 @@ func Render(lr *sirena.LayoutResult, theme *Theme) ([]byte, error) {
 
 	b.WriteString("</svg>\n")
 	return b.Bytes(), nil
+}
+
+// Include routed geometry and measured captions in the viewport. Architecture
+// layout bounds describe boxes; a relationship caption can extend beyond them.
+func svgBounds(lr *sirena.LayoutResult) sirena.Rect {
+	bounds := lr.Bounds
+	include := func(p sirena.Point) {
+		bounds.Min.X, bounds.Min.Y = min(bounds.Min.X, p.X), min(bounds.Min.Y, p.Y)
+		bounds.Max.X, bounds.Max.Y = max(bounds.Max.X, p.X), max(bounds.Max.Y, p.Y)
+	}
+	for _, edge := range lr.EdgeRoutes {
+		if edge == nil {
+			continue
+		}
+		for _, point := range edge.Points {
+			include(point)
+		}
+		if label := edge.Label; label != nil && label.Text != "" {
+			half := labelHalf(label.Text)
+			include(sirena.Point{X: label.Anchor.X - half, Y: label.Anchor.Y - labelSize})
+			include(sirena.Point{X: label.Anchor.X + half, Y: label.Anchor.Y + labelSize})
+		}
+	}
+	return bounds
 }
 
 // writeStyle emits the :root token declarations (sorted) followed by the
