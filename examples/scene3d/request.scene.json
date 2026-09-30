@@ -33,10 +33,10 @@
         "color": "#edf8f5",
         "font": "600 16px sans-serif",
         "id": "label:browser",
-        "shiftY": -0.6995515695067265,
+        "shiftY": -0.787878787878788,
         "shiftZ": 0.5,
         "text": "Browser",
-        "x": -5.192825112107624
+        "x": -5.090909090909091
       },
       {
         "background": "#101923",
@@ -44,10 +44,10 @@
         "color": "#edf8f5",
         "font": "600 16px sans-serif",
         "id": "label:api",
-        "shiftY": -0.6995515695067265,
+        "shiftY": -0.787878787878788,
         "shiftZ": 0.5,
         "text": "API",
-        "x": -2.609865470852018
+        "x": -2.5454545454545454
       },
       {
         "background": "#101923",
@@ -55,10 +55,9 @@
         "color": "#edf8f5",
         "font": "600 16px sans-serif",
         "id": "label:jobs",
-        "shiftY": -0.6995515695067265,
+        "shiftY": -0.787878787878788,
         "shiftZ": 0.5,
-        "text": "Job queue",
-        "x": -0.026905829596412557
+        "text": "Job queue"
       },
       {
         "background": "#101923",
@@ -66,10 +65,10 @@
         "color": "#edf8f5",
         "font": "600 16px sans-serif",
         "id": "label:worker",
-        "shiftY": -0.6995515695067265,
+        "shiftY": -0.787878787878788,
         "shiftZ": 0.5,
         "text": "Worker",
-        "x": 2.556053811659193
+        "x": 2.5454545454545454
       },
       {
         "background": "#101923",
@@ -77,10 +76,10 @@
         "color": "#edf8f5",
         "font": "600 16px sans-serif",
         "id": "label:db",
-        "shiftY": -0.6995515695067265,
+        "shiftY": -0.787878787878788,
         "shiftZ": 0.5,
         "text": "Database",
-        "x": 5.139013452914798
+        "x": 5.090909090909091
       },
       {
         "background": "#101923",
@@ -88,8 +87,8 @@
         "font": "12px sans-serif",
         "id": "label:edge:0",
         "text": "enqueue",
-        "x": -1.399103139013453,
-        "y": 0.21524663677130046
+        "x": -1.2727272727272727,
+        "y": 0.24242424242424243
       },
       {
         "background": "#101923",
@@ -97,8 +96,8 @@
         "font": "12px sans-serif",
         "id": "label:edge:1",
         "text": "request",
-        "x": -3.901345291479821,
-        "y": 0.21524663677130046
+        "x": -3.8181818181818183,
+        "y": 0.24242424242424243
       },
       {
         "background": "#101923",
@@ -106,8 +105,8 @@
         "font": "12px sans-serif",
         "id": "label:edge:2",
         "text": "dispatch",
-        "x": 1.345291479820628,
-        "y": 0.21524663677130046
+        "x": 1.2727272727272727,
+        "y": 0.24242424242424243
       },
       {
         "background": "#101923",
@@ -115,8 +114,8 @@
         "font": "12px sans-serif",
         "id": "label:edge:3",
         "text": "persist",
-        "x": 3.8206278026905833,
-        "y": 0.21524663677130046
+        "x": 3.8181818181818183,
+        "y": 0.24242424242424243
       }
     ],
     "objects": [
@@ -126,11 +125,11 @@
         "kind": "sphere",
         "materialKind": "standard",
         "metalness": 0.15,
-        "radius": 0.5381165919282511,
+        "radius": 0.6060606060606061,
         "roughness": 0.35,
         "segments": 32,
         "wireframe": false,
-        "x": -5.192825112107624
+        "x": -5.090909090909091
       },
       {
         "color": "#a8f2da",
@@ -151,7 +150,7 @@
         "customVertex": "attribute vec3 position;\nattribute vec2 uv;\nuniform mat4 mvp;\nuniform mat3 normalMatrix;\nuniform vec3 violet;\nuniform vec3 mint;\nvarying vec2 vUv;\n\nvoid main() {\n  vUv = uv;\n  gl_Position = (mvp * vec4(position, 1.0));\n}",
         "customVertexWGSL": "struct Uniforms {\n  mvp : mat4x4\u003cf32\u003e,\n  normalMatrix : mat3x3\u003cf32\u003e,\n  violet : vec3\u003cf32\u003e,\n  mint : vec3\u003cf32\u003e,\n};\n@group(0) @binding(0) var\u003cuniform\u003e u : Uniforms;\n\nstruct VertexInput {\n  @location(0) position : vec3\u003cf32\u003e,\n  @location(1) uv : vec2\u003cf32\u003e,\n};\n\nstruct VertexOutput {\n  @builtin(position) position : vec4\u003cf32\u003e,\n  @location(0) vUv : vec2\u003cf32\u003e,\n};\n\n@vertex\nfn vertexMain(in : VertexInput) -\u003e VertexOutput {\n  var out : VertexOutput;\n  out.vUv = in.uv;\n  out.position = (u.mvp * vec4\u003cf32\u003e(in.position, 1.0));\n  return out;\n}\n\n@fragment\nfn fragmentMain(in : VertexOutput) -\u003e @location(0) vec4\u003cf32\u003e {\n  let stripe = ((sin(((in.vUv.y * 40.0) + (in.vUv.x * 10.0))) * 0.5) + 0.5);\n  return vec4\u003cf32\u003e(mix(u.violet, u.mint, stripe), 1.0);\n}",
         "depth": 0.35,
-        "height": 1.0762331838565022,
+        "height": 1.2121212121212122,
         "id": "api",
         "kind": "box",
         "materialKind": "custom",
@@ -235,22 +234,21 @@
             "group": 0
           }
         },
-        "width": 1.6143497757847534,
+        "width": 1.8181818181818183,
         "wireframe": false,
-        "x": -2.609865470852018
+        "x": -2.5454545454545454
       },
       {
         "color": "#edc183",
         "depth": 0.35,
-        "height": 1.0762331838565022,
+        "height": 1.2121212121212122,
         "id": "jobs",
         "kind": "box",
         "materialKind": "standard",
         "metalness": 0.15,
         "roughness": 0.35,
-        "width": 1.937219730941704,
-        "wireframe": false,
-        "x": -0.026905829596412557
+        "width": 1.8181818181818183,
+        "wireframe": false
       },
       {
         "color": "#a8f2da",
@@ -271,7 +269,7 @@
         "customVertex": "attribute vec3 position;\nattribute vec2 uv;\nuniform mat4 mvp;\nuniform mat3 normalMatrix;\nuniform vec3 violet;\nuniform vec3 mint;\nvarying vec2 vUv;\n\nvoid main() {\n  vUv = uv;\n  gl_Position = (mvp * vec4(position, 1.0));\n}",
         "customVertexWGSL": "struct Uniforms {\n  mvp : mat4x4\u003cf32\u003e,\n  normalMatrix : mat3x3\u003cf32\u003e,\n  violet : vec3\u003cf32\u003e,\n  mint : vec3\u003cf32\u003e,\n};\n@group(0) @binding(0) var\u003cuniform\u003e u : Uniforms;\n\nstruct VertexInput {\n  @location(0) position : vec3\u003cf32\u003e,\n  @location(1) uv : vec2\u003cf32\u003e,\n};\n\nstruct VertexOutput {\n  @builtin(position) position : vec4\u003cf32\u003e,\n  @location(0) vUv : vec2\u003cf32\u003e,\n};\n\n@vertex\nfn vertexMain(in : VertexInput) -\u003e VertexOutput {\n  var out : VertexOutput;\n  out.vUv = in.uv;\n  out.position = (u.mvp * vec4\u003cf32\u003e(in.position, 1.0));\n  return out;\n}\n\n@fragment\nfn fragmentMain(in : VertexOutput) -\u003e @location(0) vec4\u003cf32\u003e {\n  let stripe = ((sin(((in.vUv.y * 40.0) + (in.vUv.x * 10.0))) * 0.5) + 0.5);\n  return vec4\u003cf32\u003e(mix(u.violet, u.mint, stripe), 1.0);\n}",
         "depth": 0.35,
-        "height": 1.0762331838565022,
+        "height": 1.2121212121212122,
         "id": "worker",
         "kind": "box",
         "materialKind": "custom",
@@ -355,23 +353,23 @@
             "group": 0
           }
         },
-        "width": 1.6143497757847534,
+        "width": 1.8181818181818183,
         "wireframe": false,
-        "x": 2.556053811659193
+        "x": 2.5454545454545454
       },
       {
         "color": "#b9a5f7",
-        "height": 1.0762331838565022,
+        "height": 1.2121212121212122,
         "id": "db",
         "kind": "cylinder",
         "materialKind": "standard",
         "metalness": 0.15,
-        "radiusBottom": 0.7232286995515695,
-        "radiusTop": 0.7232286995515695,
+        "radiusBottom": 0.7636363636363637,
+        "radiusTop": 0.7636363636363637,
         "roughness": 0.35,
         "segments": 32,
         "wireframe": false,
-        "x": 5.139013452914798
+        "x": 5.090909090909091
       },
       {
         "color": "#658d98",
@@ -396,32 +394,32 @@
         "materialKind": "standard",
         "points": [
           {
-            "x": -1.8026905829596414,
+            "x": -1.6363636363636365,
             "y": 0,
             "z": -0.25
           },
           {
-            "x": -0.9955156950672647,
+            "x": -0.9090909090909092,
             "y": 0,
             "z": -0.25
           },
           {
-            "x": -0.9955156950672647,
+            "x": -0.9090909090909092,
             "y": 0,
             "z": -0.25
           },
           {
-            "x": -1.1755156950672647,
+            "x": -1.089090909090909,
             "y": -0.09,
             "z": -0.25
           },
           {
-            "x": -0.9955156950672647,
+            "x": -0.9090909090909092,
             "y": 0,
             "z": -0.25
           },
           {
-            "x": -1.1755156950672647,
+            "x": -1.089090909090909,
             "y": 0.09,
             "z": -0.25
           }
@@ -451,32 +449,32 @@
         "materialKind": "standard",
         "points": [
           {
-            "x": -4.385650224215246,
+            "x": -4.181818181818182,
             "y": 0,
             "z": -0.25
           },
           {
-            "x": -3.4170403587443947,
+            "x": -3.4545454545454546,
             "y": 0,
             "z": -0.25
           },
           {
-            "x": -3.4170403587443947,
+            "x": -3.4545454545454546,
             "y": 0,
             "z": -0.25
           },
           {
-            "x": -3.597040358744395,
+            "x": -3.6345454545454547,
             "y": -0.09,
             "z": -0.25
           },
           {
-            "x": -3.4170403587443947,
+            "x": -3.4545454545454546,
             "y": 0,
             "z": -0.25
           },
           {
-            "x": -3.597040358744395,
+            "x": -3.6345454545454547,
             "y": 0.09,
             "z": -0.25
           }
@@ -506,32 +504,32 @@
         "materialKind": "standard",
         "points": [
           {
-            "x": 0.9417040358744395,
+            "x": 0.9090909090909092,
             "y": 0,
             "z": -0.25
           },
           {
-            "x": 1.7488789237668163,
+            "x": 1.6363636363636365,
             "y": 0,
             "z": -0.25
           },
           {
-            "x": 1.7488789237668163,
+            "x": 1.6363636363636365,
             "y": 0,
             "z": -0.25
           },
           {
-            "x": 1.5688789237668164,
+            "x": 1.4563636363636365,
             "y": -0.09,
             "z": -0.25
           },
           {
-            "x": 1.7488789237668163,
+            "x": 1.6363636363636365,
             "y": 0,
             "z": -0.25
           },
           {
-            "x": 1.5688789237668164,
+            "x": 1.4563636363636365,
             "y": 0.09,
             "z": -0.25
           }
@@ -561,32 +559,32 @@
         "materialKind": "standard",
         "points": [
           {
-            "x": 3.36322869955157,
+            "x": 3.4545454545454546,
             "y": 0,
             "z": -0.25
           },
           {
-            "x": 4.278026905829597,
+            "x": 4.181818181818182,
             "y": 0,
             "z": -0.25
           },
           {
-            "x": 4.278026905829597,
+            "x": 4.181818181818182,
             "y": 0,
             "z": -0.25
           },
           {
-            "x": 4.098026905829597,
+            "x": 4.001818181818182,
             "y": -0.09,
             "z": -0.25
           },
           {
-            "x": 4.278026905829597,
+            "x": 4.181818181818182,
             "y": 0,
             "z": -0.25
           },
           {
-            "x": 4.098026905829597,
+            "x": 4.001818181818182,
             "y": 0.09,
             "z": -0.25
           }
@@ -612,7 +610,7 @@
               "scaleX": 1,
               "scaleY": 1,
               "scaleZ": 1,
-              "x": -2.609865470852018,
+              "x": -2.5454545454545454,
               "y": 0,
               "z": 0
             }
@@ -629,8 +627,8 @@
               "props": {
                 "id": "label:api",
                 "text": "API",
-                "x": -2.609865470852018,
-                "shiftY": -0.6995515695067265,
+                "x": -2.5454545454545454,
+                "shiftY": -0.787878787878788,
                 "shiftZ": 0.5,
                 "font": "600 16px sans-serif",
                 "color": "#edf8f5",
@@ -649,7 +647,7 @@
               "scaleX": 1,
               "scaleY": 1,
               "scaleZ": 1,
-              "x": 2.556053811659193,
+              "x": 2.5454545454545454,
               "y": 0,
               "z": 0
             }
@@ -666,8 +664,8 @@
               "props": {
                 "id": "label:worker",
                 "text": "Worker",
-                "x": 2.556053811659193,
-                "shiftY": -0.6995515695067265,
+                "x": 2.5454545454545454,
+                "shiftY": -0.787878787878788,
                 "shiftZ": 0.5,
                 "font": "600 16px sans-serif",
                 "color": "#edf8f5",
@@ -691,7 +689,7 @@
               "scaleX": 1.35,
               "scaleY": 1.35,
               "scaleZ": 1.35,
-              "x": -2.609865470852018,
+              "x": -2.5454545454545454,
               "y": 0,
               "z": 1.4
             }
@@ -708,9 +706,9 @@
               "props": {
                 "id": "label:api",
                 "text": "API",
-                "x": -2.609865470852018,
+                "x": -2.5454545454545454,
                 "z": 1.4,
-                "shiftY": -0.6995515695067265,
+                "shiftY": -0.787878787878788,
                 "shiftZ": 0.5,
                 "font": "600 16px sans-serif",
                 "color": "#edf8f5",
@@ -729,7 +727,7 @@
               "scaleX": 1,
               "scaleY": 1,
               "scaleZ": 1,
-              "x": 2.556053811659193,
+              "x": 2.5454545454545454,
               "y": 0,
               "z": 0
             }
@@ -746,8 +744,8 @@
               "props": {
                 "id": "label:worker",
                 "text": "Worker",
-                "x": 2.556053811659193,
-                "shiftY": -0.6995515695067265,
+                "x": 2.5454545454545454,
+                "shiftY": -0.787878787878788,
                 "shiftZ": 0.5,
                 "font": "600 16px sans-serif",
                 "color": "#edf8f5",
@@ -771,7 +769,7 @@
               "scaleX": 1,
               "scaleY": 1,
               "scaleZ": 1,
-              "x": -2.609865470852018,
+              "x": -2.5454545454545454,
               "y": 0,
               "z": 0
             }
@@ -788,8 +786,8 @@
               "props": {
                 "id": "label:api",
                 "text": "API",
-                "x": -2.609865470852018,
-                "shiftY": -0.6995515695067265,
+                "x": -2.5454545454545454,
+                "shiftY": -0.787878787878788,
                 "shiftZ": 0.5,
                 "font": "600 16px sans-serif",
                 "color": "#edf8f5",
@@ -808,7 +806,7 @@
               "scaleX": 1.35,
               "scaleY": 1.35,
               "scaleZ": 1.35,
-              "x": 2.556053811659193,
+              "x": 2.5454545454545454,
               "y": 0,
               "z": 1.4
             }
@@ -825,9 +823,9 @@
               "props": {
                 "id": "label:worker",
                 "text": "Worker",
-                "x": 2.556053811659193,
+                "x": 2.5454545454545454,
                 "z": 1.4,
-                "shiftY": -0.6995515695067265,
+                "shiftY": -0.787878787878788,
                 "shiftZ": 0.5,
                 "font": "600 16px sans-serif",
                 "color": "#edf8f5",
@@ -851,7 +849,7 @@
               "scaleX": 1,
               "scaleY": 1,
               "scaleZ": 1,
-              "x": -2.609865470852018,
+              "x": -2.5454545454545454,
               "y": 0,
               "z": 0
             }
@@ -868,8 +866,8 @@
               "props": {
                 "id": "label:api",
                 "text": "API",
-                "x": -2.609865470852018,
-                "shiftY": -0.6995515695067265,
+                "x": -2.5454545454545454,
+                "shiftY": -0.787878787878788,
                 "shiftZ": 0.5,
                 "font": "600 16px sans-serif",
                 "color": "#edf8f5",
@@ -888,7 +886,7 @@
               "scaleX": 1,
               "scaleY": 1,
               "scaleZ": 1,
-              "x": 2.556053811659193,
+              "x": 2.5454545454545454,
               "y": 0,
               "z": 0
             }
@@ -905,8 +903,8 @@
               "props": {
                 "id": "label:worker",
                 "text": "Worker",
-                "x": 2.556053811659193,
-                "shiftY": -0.6995515695067265,
+                "x": 2.5454545454545454,
+                "shiftY": -0.787878787878788,
                 "shiftZ": 0.5,
                 "font": "600 16px sans-serif",
                 "color": "#edf8f5",

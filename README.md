@@ -7,7 +7,7 @@ A modernized diagram language and renderer. Arch/systems diagrams as the wedge, 
 Native graphics: `sirena render --scene3d` exports GoSX Scene3D props JSON with
 typed node shapes, readable labels, routed directional relationships, boundary
 frames, and optional Selena materials. The renderer uses GoSX v0.57.1; parsing
-uses gotreesitter v0.55.1. The existing SVG and replay renderers remain available.
+uses gotreesitter v0.55.1. The existing SVG renderer remains available.
 
 ```sh
 go run ./cmd/sirena render --scene3d \
