@@ -1,0 +1,14 @@
+client browser { label: "Browser" }
+service api { label: "API"; owner: "platform"; source_ref: "code://go/example.com/service#HandleRequest" }
+queue jobs { label: "Job queue" }
+job worker { label: "Worker" }
+database db { label: "Database" }
+browser -> api: calls "request"
+api -> jobs: publishes "enqueue"
+jobs -> worker: flow "dispatch"
+worker -> db: writes "persist"
+
+view "Request" {
+ include: [client "browser", service "api", queue "jobs", job "worker", database "db", edges: outgoing from "browser", edges: outgoing from "api", edges: outgoing from "jobs", edges: outgoing from "worker"]
+ layout { direction: left-right }
+}

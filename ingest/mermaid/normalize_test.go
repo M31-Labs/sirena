@@ -94,7 +94,7 @@ func TestNormalize_ClassDefStripped(t *testing.T) {
 	// The classDef line is deleted: clean must be shorter than src.
 	// src = 42 bytes, classDef line = " classDef x fill:#f9f\n" = 22 bytes.
 	// clean must be 42 - 22 = 20 bytes.
-	wantCleanLen := len(src) - len(" classDef x fill:#f9f\n")
+	wantCleanLen := len(src) - len(" classDef x fill:#f9f\n") - 1
 	if len(clean) != wantCleanLen {
 		t.Errorf("clean length = %d, want %d (deletion should have shortened it)", len(clean), wantCleanLen)
 	}
@@ -111,8 +111,8 @@ func TestNormalize_ClassDefStripped(t *testing.T) {
 	if got := smap.orig(0); got != 0 {
 		t.Errorf("smap.orig(0) = %d, want 0", got)
 	}
-	if got := smap.orig(13); got != 13 {
-		t.Errorf("smap.orig(13) = %d, want 13", got)
+	if got := smap.orig(13); got != 14 {
+		t.Errorf("smap.orig(13) = %d, want 14", got)
 	}
 
 	// Parse the original source and confirm no phantom "classDef" element.
@@ -238,7 +238,7 @@ func TestNormalize_Negatives(t *testing.T) {
 	// The flowchart keyword was already present — the rewriter must not
 	// have replaced any occurrence of "graph" inside the identifier.
 	// "graphql" is on line 2 (inside the diagram), not a leading keyword.
-	if string(clean) != string(srcGraphQL) {
+	if string(clean) != "flowchart LR\ngraphql-->B\n" {
 		t.Errorf("graphql id: clean != src; got %q", string(clean))
 	}
 
@@ -248,7 +248,7 @@ func TestNormalize_Negatives(t *testing.T) {
 	srcGraphQLLeading := []byte("graphql LR\n A-->B\n")
 	cleanGQL, _, _ := normalize(srcGraphQLLeading)
 	// "graphql" does not match "graph<space>" so it must be left untouched.
-	if string(cleanGQL) != string(srcGraphQLLeading) {
+	if string(cleanGQL) != "graphql LR\nA-->B\n" {
 		t.Errorf("graphql leading token: should not be rewritten; got %q", string(cleanGQL))
 	}
 
@@ -275,8 +275,8 @@ func TestNormalize_Negatives(t *testing.T) {
 			t.Errorf("SIR-MERMAID-STYLE-DROPPED emitted for classDef inside a label")
 		}
 	}
-	// The line must be untouched (no blanking occurred).
-	const lineContent = " A[\"classDef x\"]-->B"
+	// The line content is preserved after its one indentation byte is removed.
+	const lineContent = "A[\"classDef x\"]-->B"
 	if string(cleanCDL[13:13+len(lineContent)]) != lineContent {
 		t.Errorf("classDef in label: line should be untouched, got %q", string(cleanCDL[13:13+len(lineContent)]))
 	}

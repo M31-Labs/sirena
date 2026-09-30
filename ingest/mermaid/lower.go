@@ -9,12 +9,13 @@ import (
 // *sirena.Document. It is constructed by Parse and used for a single Parse
 // call; it is not safe for concurrent use.
 type lowerer struct {
-	lang  *gt.Language
-	src   []byte // normalized source the CST was parsed from
-	smap  srcMap // clean-offset → original-offset remap (Task A2)
-	opts  Options
-	diags []sirena.Diagnostic
-	fatal error
+	lang     *gt.Language
+	src      []byte // normalized source the CST was parsed from
+	original []byte // original source, retained for lossless label text
+	smap     srcMap // clean-offset → original-offset remap (Task A2)
+	opts     Options
+	diags    []sirena.Diagnostic
+	fatal    error
 
 	// element dedup: source-order slice + fast-lookup map
 	elemOrder []string
@@ -288,8 +289,28 @@ func (l *lowerer) arrowLabel(linkNode *gt.Node) string {
 	for i := 0; i < linkNode.NamedChildCount(); i++ {
 		c := linkNode.NamedChild(i)
 		if c.Type(l.lang) == "flow_arrow_text" {
-			return string(l.src[c.StartByte():c.EndByte()])
+			return l.originalText(c)
 		}
+	}
+	return ""
+}
+
+// originalText returns the source range covered by node using the original
+// input. It is used for labels whose normalized spelling is parser-safe but
+// differs from the user's text (currently arrow-label slashes).
+func (l *lowerer) originalText(node *gt.Node) string {
+	if node == nil {
+		return ""
+	}
+	start := l.smap.orig(int(node.StartByte()))
+	end := l.smap.orig(int(node.EndByte()))
+	if start >= 0 && end >= start && end <= len(l.original) {
+		return string(l.original[start:end])
+	}
+	start = int(node.StartByte())
+	end = int(node.EndByte())
+	if start >= 0 && end >= start && end <= len(l.src) {
+		return string(l.src[start:end])
 	}
 	return ""
 }

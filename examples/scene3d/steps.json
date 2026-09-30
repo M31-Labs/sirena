@@ -1,0 +1,6 @@
+[
+  {"label":"The request path"},
+  {"label":"Focus the API", "patches":[{"target":"api", "z":1.4, "scale":1.35}]},
+  {"label":"Focus the worker", "patches":[{"target":"worker", "z":1.4, "scale":1.35}]},
+  {"label":"Return to the whole system"}
+]

@@ -70,6 +70,17 @@ func (m srcMap) orig(cleanOffset int) int {
 	return preOffset
 }
 
+// origPre maps an offset in the keyword-rewritten buffer directly to the
+// original source. Callers use it while stripAndNeutralize is scanning that
+// pre-deletion buffer; using orig there would incorrectly re-add indentation
+// deletions that have already been accounted for by the scan position.
+func (m srcMap) origPre(preOffset int) int {
+	if m.shiftDelta != 0 && preOffset >= m.shiftAt {
+		return preOffset - m.shiftDelta
+	}
+	return preOffset
+}
+
 // normalize performs three edits on the raw Mermaid source before it is
 // handed to the grammar parser:
 //
@@ -83,12 +94,18 @@ func (m srcMap) orig(cleanOffset int) int {
 //     correctly to the original source. Each stripped line emits one
 //     SIR-MERMAID-STYLE-DROPPED warning with a Range pointing at the
 //     original-source line span (inclusive of the newline).
-//  3. Replaces statement-position semicolons with spaces (length-preserving).
-//     Semicolons inside "quoted strings" or [label]/(label) brackets are left
-//     untouched.
+//  3. Removes leading horizontal indentation from kept lines. Mermaid's
+//     reference grammar accepts indentation, but the v0.47 runtime's generated
+//     lexer treats it as an error token; recording each removed prefix in the
+//     srcMap keeps CST ranges anchored to the original source.
+//  4. Replaces statement-position semicolons with spaces (length-preserving)
+//     and blanks recoverable trailing-arrow lines so later valid statements can
+//     still be parsed. Semicolons inside "quoted strings" or [label]/(label)
+//     brackets are left untouched.
 func normalize(src []byte) (clean []byte, preDiags []sirena.Diagnostic, smap srcMap) {
 	clean, smap = rewriteGraphKeyword(src)
 	clean, preDiags, smap = stripAndNeutralize(clean, preDiags, smap)
+	clean, preDiags, smap = recoverMalformedStatements(clean, preDiags, smap)
 	return clean, preDiags, smap
 }
 
@@ -208,8 +225,8 @@ func stripAndNeutralize(src []byte, diags []sirena.Diagnostic, smap srcMap) ([]b
 			// At this point smap only has the keyword-shift; deletions haven't been
 			// recorded yet, so smap.orig gives correct keyword-rewritten→original
 			// offsets for this line (it's still in the keyword-rewritten buffer).
-			origStart := smap.orig(lineStart)
-			origEnd := smap.orig(lineEnd)
+			origStart := smap.origPre(lineStart)
+			origEnd := smap.origPre(lineEnd)
 			diags = append(diags, sirena.Diagnostic{
 				Code:     "SIR-MERMAID-STYLE-DROPPED",
 				Severity: sirena.SeverityWarning,
@@ -231,12 +248,26 @@ func stripAndNeutralize(src []byte, diags []sirena.Diagnostic, smap srcMap) ([]b
 		}
 
 		if !stripped {
-			// Append this line to out (with its newline), then neutralize
+			// Remove indentation from kept lines. The v0.47 Mermaid lexer
+			// reports leading spaces as errors, while Mermaid sources commonly
+			// indent statements for readability. Keep the newline so line
+			// boundaries remain stable and record the deleted prefix for ranges.
+			indentLen := kwStart
+			contentStart := lineStart + indentLen
+			if indentLen > 0 {
+				smap.edits = append(smap.edits, srcEdit{
+					preOff:       lineStart,
+					deletedBytes: indentLen,
+				})
+			}
+
+			// Append the unindented line (with its newline), then neutralize
 			// semicolons in the appended segment.
 			segStart := len(out)
-			out = append(out, src[lineStart:lineEndIncl]...)
-			segEnd := segStart + (lineEnd - lineStart)
+			out = append(out, src[contentStart:lineEndIncl]...)
+			segEnd := segStart + (lineEnd - contentStart)
 			neutralizeSemicolons(out, segStart, segEnd)
+			neutralizeArrowLabelSlashes(out, segStart, segEnd)
 		}
 
 		prePos = lineEndIncl
@@ -249,6 +280,211 @@ func stripAndNeutralize(src []byte, diags []sirena.Diagnostic, smap srcMap) ([]b
 	})
 
 	return out, diags, smap
+}
+
+// recoverMalformedStatements removes a narrow class of recoverable malformed
+// statements before parsing. gotreesitter v0.47 can recover from a trailing
+// edge arrow only by promoting the entire source_file to an ERROR node, which
+// hides otherwise valid diagram_flow children. Replacing the malformed line's
+// content preserves the line boundary and lets the valid statements parse;
+// the warning points back to the original line through smap.orig.
+func recoverMalformedStatements(src []byte, diags []sirena.Diagnostic, smap srcMap) ([]byte, []sirena.Diagnostic, srcMap) {
+	out := append([]byte(nil), src...)
+	for lineStart := 0; lineStart < len(out); {
+		lineEnd := lineStart
+		for lineEnd < len(out) && out[lineEnd] != '\n' {
+			lineEnd++
+		}
+		trimmedStart := lineStart
+		for trimmedStart < lineEnd && (out[trimmedStart] == ' ' || out[trimmedStart] == '\t') {
+			trimmedStart++
+		}
+		line := out[trimmedStart:lineEnd]
+		if hasTrailingArrow(line) {
+			origStart := smap.orig(lineStart)
+			origEnd := smap.orig(lineEnd)
+			diags = append(diags, sirena.Diagnostic{
+				Code:     "SIR-MERMAID-PARSE",
+				Severity: sirena.SeverityWarning,
+				Message:  "Mermaid edge statement is missing a target and was skipped",
+				Range:    sirena.Range{Start: origStart, End: origEnd},
+			})
+			// Remove the malformed content but preserve its newline. A line of
+			// spaces is still an error token in v0.47, so deletion is required.
+			preOff := lineStart
+			for _, e := range smap.edits {
+				if preOff >= e.preOff {
+					preOff += e.deletedBytes
+				}
+			}
+			if deleted := lineEnd - lineStart; deleted > 0 {
+				smap.edits = append(smap.edits, srcEdit{preOff: preOff, deletedBytes: deleted})
+				out = append(out[:lineStart], out[lineEnd:]...)
+			}
+			if lineStart >= len(out) {
+				break
+			}
+			lineStart++
+			continue
+		}
+		if lineEnd == len(out) {
+			break
+		}
+		lineStart = lineEnd + 1
+	}
+	sort.Slice(smap.edits, func(i, j int) bool {
+		return smap.edits[i].preOff < smap.edits[j].preOff
+	})
+	return out, diags, smap
+}
+
+// hasTrailingArrow reports whether a statement contains a node before a
+// Mermaid edge operator but no target node after it. It intentionally accepts
+// only complete operator spellings and an end-of-line boundary, so labels and
+// ordinary vertex declarations are unaffected.
+func hasTrailingArrow(line []byte) bool {
+	if len(line) == 0 || bytes.HasPrefix(line, []byte("%%")) {
+		return false
+	}
+	for _, arrow := range [][]byte{
+		[]byte("-.->"), []byte("-..->"), []byte("--->"), []byte("-->"),
+		[]byte("-.-"), []byte("==>"), []byte("==="), []byte("~~~"),
+		[]byte("---"), []byte("-x"), []byte("-o"),
+	} {
+		if len(line) <= len(arrow) || !bytes.HasSuffix(line, arrow) {
+			continue
+		}
+		prefix := bytes.TrimSpace(line[:len(line)-len(arrow)])
+		if len(prefix) == 0 {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+// neutralizeArrowLabelSlashes replaces slash characters inside Mermaid
+// arrow labels with underscores for the parser. The v0.47 Mermaid grammar
+// rejects a slash after multiple label words (for example, "HTTP POST /login")
+// even though that spelling is valid Mermaid. This is length-preserving; the
+// lowerer reads the original source range back when it constructs Edge.Label.
+func neutralizeArrowLabelSlashes(out []byte, lineStart, lineEnd int) {
+	inLabel := false
+	labelStart := 0
+	labelInQuote := false
+	labelEscaped := false
+	inQuote := false
+	escaped := false
+	depth := 0 // node-label delimiters ([...], (...), {...})
+	for i := lineStart; i < lineEnd; i++ {
+		ch := out[i]
+		if inLabel {
+			// Mermaid arrow labels are delimited by the next pipe. Keep
+			// the parser-safe substitution scoped to that span; bracket
+			// characters in label text are ordinary content here. Delay the
+			// rewrite until a closing delimiter is found, so a malformed
+			// open label cannot rewrite a following node's text.
+			if labelInQuote {
+				if labelEscaped {
+					labelEscaped = false
+					continue
+				}
+				if ch == '\\' {
+					labelEscaped = true
+					continue
+				}
+				if ch == '"' {
+					labelInQuote = false
+				}
+				continue
+			}
+			if ch == '"' {
+				labelInQuote = true
+				continue
+			}
+			if ch == '|' {
+				for j := labelStart; j < i; j++ {
+					if out[j] == '/' {
+						out[j] = '_'
+					}
+				}
+				inLabel = false
+			}
+			continue
+		}
+
+		if inQuote {
+			if escaped {
+				escaped = false
+				continue
+			}
+			if ch == '\\' {
+				escaped = true
+				continue
+			}
+			if ch == '"' {
+				inQuote = false
+			}
+			continue
+		}
+
+		switch ch {
+		case '"':
+			inQuote = true
+		case '[', '(', '{':
+			depth++
+		case ']', ')', '}':
+			if depth > 0 {
+				depth--
+			}
+		case '|':
+			// A pipe in a node label is content, not an edge-label
+			// delimiter. Only enter label mode when the pipe follows an
+			// edge operator at top level.
+			if depth == 0 && hasArrowOperatorBefore(out, lineStart, i) {
+				inLabel = true
+				labelStart = i + 1
+				labelInQuote = false
+				labelEscaped = false
+			}
+		}
+	}
+}
+
+// hasArrowOperatorBefore reports whether the bytes immediately before pipe
+// form a Mermaid edge operator. It accepts the punctuation variants supported
+// by Mermaid (plain, dotted, thick, invisible, and endpoint marker links),
+// including an optional amount of whitespace before the label delimiter.
+// Requiring at least two operator punctuation bytes prevents a free-standing
+// pipe in a node id or prose from being treated as an edge label.
+func hasArrowOperatorBefore(src []byte, lineStart, pipe int) bool {
+	end := pipe
+	for end > lineStart && (src[end-1] == ' ' || src[end-1] == '\t') {
+		end--
+	}
+	start := end
+	for start > lineStart && isArrowOperatorByte(src[start-1]) {
+		start--
+	}
+	if end-start < 2 {
+		return false
+	}
+	for _, ch := range src[start:end] {
+		switch ch {
+		case '-', '=', '~':
+			return true
+		}
+	}
+	return false
+}
+
+func isArrowOperatorByte(ch byte) bool {
+	switch ch {
+	case '-', '=', '~', '.', '<', '>', 'x', 'o':
+		return true
+	default:
+		return false
+	}
 }
 
 // neutralizeSemicolons replaces statement-position ';' characters in the

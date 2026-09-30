@@ -417,14 +417,20 @@ func SirenaGrammar() *grammargen.Grammar {
 
 	// selector_list → "[" selector* "]"
 	//
-	// Selectors are whitespace-separated (newlines are extras) rather than
-	// comma-separated — the spec's include block lists items one per line
-	// with no punctuation between them. Each selector starts with a
+	// Selectors may be whitespace- or comma-separated (newlines are extras),
+	// so both one-per-line and conventional comma-delimited include blocks
+	// remain valid. Each selector starts with a
 	// distinct terminal (`boundary` / a kind_keyword / `edges`) so the
 	// parser does not need a separator to detect item boundaries.
 	g.Define("selector_list", grammargen.Seq(
 		grammargen.Str("["),
-		grammargen.Repeat(grammargen.Sym("_selector")),
+		grammargen.Optional(grammargen.Seq(
+			grammargen.Sym("_selector"),
+			grammargen.Repeat(grammargen.Seq(
+				grammargen.Optional(grammargen.Str(",")),
+				grammargen.Sym("_selector"),
+			)),
+		)),
 		grammargen.Str("]"),
 	))
 
@@ -537,10 +543,7 @@ func SirenaGrammar() *grammargen.Grammar {
 	// identifier → [A-Za-z_][A-Za-z0-9_]*
 	// Word rule so kind_keyword's anonymous tokens are matched against it
 	// for keyword-vs-identifier disambiguation.
-	g.Define("identifier", grammargen.Token(grammargen.Seq(
-		grammargen.Pat(`[A-Za-z_]`),
-		grammargen.Repeat(grammargen.Pat(`[A-Za-z0-9_]`)),
-	)))
+	g.Define("identifier", grammargen.Pat(`[A-Za-z_][A-Za-z0-9_]*`))
 	g.SetWord("identifier")
 
 	// dashed_ident → identifier ("-" identifier)+
@@ -570,20 +573,7 @@ func SirenaGrammar() *grammargen.Grammar {
 	)))
 
 	// string → double-quoted string literal with simple backslash escapes.
-	g.Define("string", grammargen.Seq(
-		grammargen.Str("\""),
-		grammargen.Optional(grammargen.Sym("_string_content")),
-		grammargen.Str("\""),
-	))
-	g.Define("_string_content", grammargen.Repeat1(grammargen.Choice(
-		grammargen.Sym("string_content"),
-		grammargen.Sym("escape_sequence"),
-	)))
-	g.Define("string_content", grammargen.ImmToken(grammargen.Prec(1, grammargen.Pat(`[^\\"\n]+`))))
-	g.Define("escape_sequence", grammargen.ImmToken(grammargen.Seq(
-		grammargen.Str("\\"),
-		grammargen.Pat(`["\\nrtbfv0]`),
-	)))
+	g.Define("string", grammargen.Token(grammargen.Pat(`"(?:\\.|[^"\\\n])*"`)))
 
 	// number → optional sign, integer, optional fraction, optional exponent.
 	g.Define("number", grammargen.Token(grammargen.Seq(

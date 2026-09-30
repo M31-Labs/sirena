@@ -32,12 +32,26 @@ func RunRender(args []string, stdout, stderr io.Writer) int {
 	themeName := fs.String("theme", svg.DefaultThemeName, "theme name")
 	strict := fs.Bool("strict-budget", false, "fail if the view exceeds its budget")
 	fromFlag := fs.String("from", "", "force input format: mermaid or sirena")
+	scene3D := fs.Bool("scene3d", false, "export native GoSX Scene3D props JSON")
+	shaderPath := fs.String("shader", "", "Selena material source (requires --scene3d)")
+	material := fs.String("material", "", "Selena material name")
+	shaderTargets := fs.String("targets", "", "comma-separated shader node identities")
+	motion := fs.Bool("motion", false, "slow node rotation (requires --scene3d)")
+	stepsPath := fs.String("steps", "", "absolute presentation keyframes JSON (requires --scene3d)")
 	infer := fs.Bool("infer", false, "promote Mermaid shapes/labels to typed sirena kinds")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
 	if fs.NArg() != 1 {
 		fmt.Fprintln(stderr, "usage: sirena render [-o out.svg] [--theme name] [--strict-budget] [--from mermaid|sirena] [--infer] <view-or-system>")
+		return 2
+	}
+	if !*scene3D && (*shaderPath != "" || *material != "" || *shaderTargets != "" || *motion || *stepsPath != "") {
+		fmt.Fprintln(stderr, "Scene3D options require --scene3d")
+		return 2
+	}
+	if *shaderPath == "" && (*material != "" || *shaderTargets != "") {
+		fmt.Fprintln(stderr, "--material and --targets require --shader")
 		return 2
 	}
 
@@ -58,11 +72,15 @@ func RunRender(args []string, stdout, stderr io.Writer) int {
 	var (
 		svgBytes []byte
 	)
-	switch format {
-	case "mermaid":
-		svgBytes, code = renderMermaid(target, *infer, *strict, theme, stderr)
-	case "sirena":
-		svgBytes, code = renderSirena(target, *strict, theme, stderr)
+	if *scene3D {
+		svgBytes, code = renderScene3D(target, format, *infer, *strict, *shaderPath, *material, *shaderTargets, *motion, *stepsPath, stderr)
+	} else {
+		switch format {
+		case "mermaid":
+			svgBytes, code = renderMermaid(target, *infer, *strict, theme, stderr)
+		case "sirena":
+			svgBytes, code = renderSirena(target, *strict, theme, stderr)
+		}
 	}
 	if code != 0 {
 		return code
