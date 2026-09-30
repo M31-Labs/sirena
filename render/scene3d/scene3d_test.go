@@ -3,6 +3,7 @@ package scene3d
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -119,4 +120,92 @@ func mustJSON(v any) []byte {
 		panic(err)
 	}
 	return b
+}
+
+func TestCompleteSceneItemLimit(t *testing.T) {
+	bounds := sirena.Rect{Max: sirena.Point{X: 100, Y: 100}}
+	for _, kind := range []string{"nodes", "summaries", "boundaries", "nested boundaries", "edges", "labeled edges"} {
+		t.Run(kind, func(t *testing.T) {
+			itemsPerPlacement := 2
+			if kind == "edges" {
+				itemsPerPlacement = 1
+			}
+			limit := maxSceneItems / itemsPerPlacement
+			makeLayout := func(count int) *sirena.LayoutResult {
+				lr := &sirena.LayoutResult{Bounds: bounds}
+				var parent *sirena.BoundaryPlacement
+				for i := 0; i < count; i++ {
+					name := fmt.Sprintf("item-%d", i)
+					switch kind {
+					case "nodes":
+						lr.NodePlacements = append(lr.NodePlacements, &sirena.NodePlacement{Node: &sirena.Element{Name: name}, Bounds: bounds})
+					case "summaries":
+						lr.SummaryPlacements = append(lr.SummaryPlacements, &sirena.SummaryPlacement{Summary: &sirena.BoundarySummary{Boundary: &sirena.Boundary{Name: name}, Label: name}, Bounds: bounds})
+					case "boundaries", "nested boundaries":
+						bp := &sirena.BoundaryPlacement{Boundary: &sirena.Boundary{Name: name}, Bounds: bounds}
+						if kind == "nested boundaries" && parent != nil {
+							parent.Children = []*sirena.BoundaryPlacement{bp}
+						} else {
+							lr.BoundaryPlacements = append(lr.BoundaryPlacements, bp)
+						}
+						parent = bp
+					case "edges", "labeled edges":
+						route := &sirena.EdgeRoute{Edge: &sirena.Edge{}, Points: []sirena.Point{{}, {X: 1}}}
+						if kind == "labeled edges" {
+							route.Label = &sirena.EdgeLabel{Text: name}
+						}
+						lr.EdgeRoutes = append(lr.EdgeRoutes, route)
+					}
+				}
+				return lr
+			}
+			data, err := Build(makeLayout(limit), Options{})
+			if err != nil {
+				t.Fatalf("exact limit rejected: %v", err)
+			}
+			var props struct {
+				Scene scene.SceneIR `json:"scene"`
+			}
+			if err := json.Unmarshal(data, &props); err != nil {
+				t.Fatal(err)
+			}
+			if got := len(props.Scene.Objects) + len(props.Scene.Labels); got != maxSceneItems {
+				t.Fatalf("emitted %d items, want %d", got, maxSceneItems)
+			}
+			if _, err := Build(makeLayout(limit+1), Options{}); err == nil || !strings.Contains(err.Error(), "at most 2000 scene objects and labels") {
+				t.Fatalf("overflow accepted: %v", err)
+			}
+		})
+	}
+}
+
+func TestSceneItemLimitAggregatesPlacementKinds(t *testing.T) {
+	bounds := sirena.Rect{Max: sirena.Point{X: 100, Y: 100}}
+	lr := &sirena.LayoutResult{Bounds: bounds}
+	for i := 0; i < 998; i++ {
+		lr.NodePlacements = append(lr.NodePlacements, &sirena.NodePlacement{Node: &sirena.Element{Name: fmt.Sprintf("node-%d", i)}, Bounds: bounds})
+	}
+	lr.SummaryPlacements = []*sirena.SummaryPlacement{{Summary: &sirena.BoundarySummary{Boundary: &sirena.Boundary{Name: "collapsed"}, Label: "Collapsed"}, Bounds: bounds}}
+	lr.BoundaryPlacements = []*sirena.BoundaryPlacement{{Boundary: &sirena.Boundary{Name: "visible"}, Bounds: bounds}}
+	// Invalid/nil placements do not emit objects and must not consume the cap.
+	lr.NodePlacements = append(lr.NodePlacements, nil, &sirena.NodePlacement{})
+	lr.SummaryPlacements = append(lr.SummaryPlacements, nil, &sirena.SummaryPlacement{})
+	lr.BoundaryPlacements = append(lr.BoundaryPlacements, nil)
+	if _, err := Build(lr, Options{}); err != nil {
+		t.Fatalf("exact mixed limit rejected: %v", err)
+	}
+	lr.EdgeRoutes = []*sirena.EdgeRoute{{Edge: &sirena.Edge{}, Points: []sirena.Point{{}, {X: 1}}}}
+	if _, err := Build(lr, Options{}); err == nil || !strings.Contains(err.Error(), "at most 2000") {
+		t.Fatalf("mixed overflow accepted: %v", err)
+	}
+}
+
+func TestBoundaryPlacementCycleRejected(t *testing.T) {
+	// Implicit boundaries emit no frame; counting alone cannot detect this cycle.
+	implicit := &sirena.BoundaryPlacement{}
+	implicit.Children = []*sirena.BoundaryPlacement{implicit}
+	lr := &sirena.LayoutResult{Bounds: sirena.Rect{Max: sirena.Point{X: 1, Y: 1}}, BoundaryPlacements: []*sirena.BoundaryPlacement{implicit}}
+	if _, err := Build(lr, Options{}); err == nil || !strings.Contains(err.Error(), "cyclic boundary") {
+		t.Fatalf("cycle accepted: %v", err)
+	}
 }

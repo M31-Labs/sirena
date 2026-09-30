@@ -12,6 +12,8 @@ import (
 	"m31labs.dev/sirena"
 )
 
+const maxSceneItems = 2000
+
 type Options struct {
 	Shader   []byte
 	Material string
@@ -53,9 +55,6 @@ func Build(lr *sirena.LayoutResult, opts Options) ([]byte, error) {
 	if lr == nil || lr.Bounds.Width() <= 0 || lr.Bounds.Height() <= 0 {
 		return nil, fmt.Errorf("sirena scene3d: a non-empty layout is required")
 	}
-	if len(lr.NodePlacements)+len(lr.EdgeRoutes) > 2000 {
-		return nil, fmt.Errorf("sirena scene3d: select a view with at most 2000 nodes and edges")
-	}
 	var custom scene.Material
 	if len(opts.Shader) > 0 {
 		material, _, err := scene.CompileSelenaMaterial(opts.Shader, scene.SelenaMaterialOptions{Material: opts.Material, Standard: scene.StandardMaterial{Color: "#a8f2da"}})
@@ -69,6 +68,13 @@ func Build(lr *sirena.LayoutResult, opts Options) ([]byte, error) {
 	center := lr.Bounds.Center()
 	point := func(p sirena.Point) scene.Vector3 { return scene.Vec3((p.X-center.X)*scale, (center.Y-p.Y)*scale, 0) }
 	var nodes []scene.Node
+	emit := func(items ...scene.Node) error {
+		if len(nodes)+len(items) > maxSceneItems {
+			return fmt.Errorf("sirena scene3d: select a view with at most %d scene objects and labels", maxSceneItems)
+		}
+		nodes = append(nodes, items...)
+		return nil
+	}
 	known := map[string]bool{}
 	selected := map[string]bool{}
 	for _, id := range opts.Targets {
@@ -117,7 +123,9 @@ func Build(lr *sirena.LayoutResult, opts Options) ([]byte, error) {
 		if opts.Motion {
 			mesh.Spin = scene.Euler{Y: .18}
 		}
-		nodes = append(nodes, mesh, scene.Label{ID: "label:" + id, Target: id, Text: elementLabel(n), Shift: scene.Vec3(0, -height*.65, .5), Color: "#edf8f5", Background: "#101923", Font: "600 16px sans-serif", Collision: "shift"})
+		if err := emit(mesh, scene.Label{ID: "label:" + id, Target: id, Text: elementLabel(n), Shift: scene.Vec3(0, -height*.65, .5), Color: "#edf8f5", Background: "#101923", Font: "600 16px sans-serif", Collision: "shift"}); err != nil {
+			return nil, err
+		}
 	}
 	for id := range selected {
 		if !known[id] {
@@ -133,15 +141,22 @@ func Build(lr *sirena.LayoutResult, opts Options) ([]byte, error) {
 			return nil, err
 		}
 		pos := point(placement.Bounds.Center())
-		nodes = append(nodes, scene.Mesh{ID: id, Geometry: scene.BoxGeometry{Width: placement.Bounds.Width() * scale, Height: placement.Bounds.Height() * scale, Depth: .3}, Material: scene.StandardMaterial{Color: "#879ca8"}, Position: pos}, scene.Label{ID: "label:" + id, Target: id, Text: placement.Summary.Label, Shift: scene.Vec3(0, -placement.Bounds.Height()*scale*.65, .5), Color: "#edf8f5"})
+		if err := emit(scene.Mesh{ID: id, Geometry: scene.BoxGeometry{Width: placement.Bounds.Width() * scale, Height: placement.Bounds.Height() * scale, Depth: .3}, Material: scene.StandardMaterial{Color: "#879ca8"}, Position: pos}, scene.Label{ID: "label:" + id, Target: id, Text: placement.Summary.Label, Shift: scene.Vec3(0, -placement.Bounds.Height()*scale*.65, .5), Color: "#edf8f5"}); err != nil {
+			return nil, err
+		}
 	}
 	// Boundaries stay visible as shallow frames behind their contained nodes.
+	activeBoundaries := map[*sirena.BoundaryPlacement]bool{}
 	var boundaryNodes func([]*sirena.BoundaryPlacement) error
 	boundaryNodes = func(placements []*sirena.BoundaryPlacement) error {
 		for _, placement := range placements {
 			if placement == nil {
 				continue
 			}
+			if activeBoundaries[placement] {
+				return fmt.Errorf("sirena scene3d: cyclic boundary placements")
+			}
+			activeBoundaries[placement] = true
 			if placement.Boundary != nil {
 				id := "boundary:" + placement.Boundary.Name
 				if err := add(id); err != nil {
@@ -149,11 +164,14 @@ func Build(lr *sirena.LayoutResult, opts Options) ([]byte, error) {
 				}
 				a, b := point(placement.Bounds.Min), point(placement.Bounds.Max)
 				points := []scene.Vector3{scene.Vec3(a.X, a.Y, -.7), scene.Vec3(b.X, a.Y, -.7), scene.Vec3(b.X, b.Y, -.7), scene.Vec3(a.X, b.Y, -.7)}
-				nodes = append(nodes, scene.Mesh{ID: id, Geometry: scene.LinesGeometry{Points: points, Segments: [][2]int{{0, 1}, {1, 2}, {2, 3}, {3, 0}}}, Material: scene.StandardMaterial{Color: "#506c7b", Emissive: 1}}, scene.Label{ID: "label:" + id, Text: boundaryLabel(placement.Boundary), Position: scene.Vec3(a.X+.25, a.Y-.2, -.4), Color: "#a7bdc9", Font: "12px sans-serif"})
+				if err := emit(scene.Mesh{ID: id, Geometry: scene.LinesGeometry{Points: points, Segments: [][2]int{{0, 1}, {1, 2}, {2, 3}, {3, 0}}}, Material: scene.StandardMaterial{Color: "#506c7b", Emissive: 1}}, scene.Label{ID: "label:" + id, Text: boundaryLabel(placement.Boundary), Position: scene.Vec3(a.X+.25, a.Y-.2, -.4), Color: "#a7bdc9", Font: "12px sans-serif"}); err != nil {
+					return err
+				}
 			}
 			if err := boundaryNodes(placement.Children); err != nil {
 				return err
 			}
+			delete(activeBoundaries, placement)
 		}
 		return nil
 	}
@@ -202,9 +220,13 @@ func Build(lr *sirena.LayoutResult, opts Options) ([]byte, error) {
 		if route.Edge.Direction == sirena.DirReverse || route.Edge.Direction == sirena.DirBidirectional {
 			arrow(points[0], points[1])
 		}
-		nodes = append(nodes, scene.Mesh{ID: id, Geometry: scene.LinesGeometry{Points: points, Segments: segments, Width: 2}, Material: scene.StandardMaterial{Color: "#658d98", Emissive: 1}})
+		if err := emit(scene.Mesh{ID: id, Geometry: scene.LinesGeometry{Points: points, Segments: segments, Width: 2}, Material: scene.StandardMaterial{Color: "#658d98", Emissive: 1}}); err != nil {
+			return nil, err
+		}
 		if route.Label != nil && route.Label.Text != "" {
-			nodes = append(nodes, scene.Label{ID: "label:" + id, Text: route.Label.Text, Position: point(route.Label.Anchor), Color: "#bacdd2", Font: "12px sans-serif", Background: "#101923"})
+			if err := emit(scene.Label{ID: "label:" + id, Text: route.Label.Text, Position: point(route.Label.Anchor), Color: "#bacdd2", Font: "12px sans-serif", Background: "#101923"}); err != nil {
+				return nil, err
+			}
 		}
 	}
 	props := scene.Props{AriaLabel: "Sirena diagram", Background: "transparent", CanvasAlpha: scene.Bool(true), Responsive: scene.Bool(true), FillHeight: scene.Bool(true), DragToRotate: scene.Bool(true), MaxFrameRate: 30, MaxDevicePixelRatio: 1.5, MaxPixels: 2_000_000, AdaptiveQuality: scene.Bool(true), Camera: scene.PerspectiveCamera{Position: scene.Vec3(0, 0, 11), FOV: 50, Near: .1, Far: 100}, Environment: scene.Environment{AmbientIntensity: .85}, Graph: scene.NewGraph(nodes...)}

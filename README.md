@@ -2,7 +2,18 @@
 
 A modernized diagram language and renderer. Arch/systems diagrams as the wedge, with a multi-file project model and a pure-Go layout engine — designed to be mdpp's native diagram surface. No JavaScript toolchain, no headless browser; pure Go end to end.
 
-**Status:** pre-v0.1, in active development. Public release is gated on the v0.1 ship plan. See `hypha://m31labs/sirena` (M31 Labs internal) for the design spec and ongoing plan.
+**Status:** v0.2.0 release candidate, with native GoSX Scene3D export.
+
+Install from source with Go 1.26 or newer:
+
+```sh
+git clone https://github.com/M31-Labs/sirena.git
+cd sirena
+go install ./cmd/sirena
+```
+
+The executable is installed in `$(go env GOPATH)/bin` (or `GOBIN` when set).
+Add that directory to your `PATH`, then run `sirena --help`.
 
 Native graphics: `sirena render --scene3d` exports GoSX Scene3D props JSON with
 typed node shapes, readable labels, routed directional relationships, boundary
@@ -35,4 +46,5 @@ The first frame is the initial state; subsequent frames are presentation steps.
 
 Defaults cap graphics at 30 FPS, 1.5 device pixel ratio, and two million pixels
 with adaptive quality. Large systems should select a view before rendering:
-the Scene3D adapter caps nodes plus edges at 2000 and keyframes at 128.
+the Scene3D adapter caps all emitted scene objects and labels at 2000, including
+nodes, edges, summaries, and nested boundary frames. Keyframes are capped at 128.
