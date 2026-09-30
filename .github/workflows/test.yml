@@ -43,10 +43,3 @@ jobs:
       - name: Build CLI
         if: matrix.module == '.'
         run: go build ./cmd/sirena
-
-      - name: Repeatable rendering benchmarks
-        run: go test ./render/svg -run '^$' -bench 'BenchmarkDiagramPipeline/(class|sequence)/(100|500)$' -benchtime=10x -benchmem > "$RUNNER_TEMP/sirena-benchmark.log"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: svg-render-benchmarks
-          path: ${{ runner.temp }}/sirena-benchmark.log
