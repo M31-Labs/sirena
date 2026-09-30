@@ -45,7 +45,16 @@ func RunRender(args []string, stdout, stderr io.Writer) int {
 	motionDistance := fs.Float64("motion-distance", -1, "float amplitude in world units")
 	motionStyle := fs.String("motion-style", "", "native motion: spin or float (requires --scene3d)")
 	infer := fs.Bool("infer", false, "promote Mermaid shapes/labels to typed sirena kinds")
+	fs.Usage = func() {
+		fmt.Fprintln(stderr, "usage: sirena render [options] <view-or-system>")
+		fmt.Fprintln(stderr, "  sirena render --diagram sequence -o sequence.svg request.sir")
+		fmt.Fprintln(stderr, "  sirena render --diagram radial --scene3d --tour nodes --motion-style float -o scene.json system.sir")
+		fs.PrintDefaults()
+	}
 	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			return 0
+		}
 		return 2
 	}
 	var speed, distance *float64
@@ -93,7 +102,7 @@ func RunRender(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 	if fs.NArg() != 1 {
-		fmt.Fprintln(stderr, "usage: sirena render [-o out.svg] [--theme name] [--strict-budget] [--from mermaid|sirena] [--infer] <view-or-system>")
+		fs.Usage()
 		return 2
 	}
 	if !*scene3D && (*shaderPath != "" || *material != "" || *shaderTargets != "" || *motion || *stepsPath != "" || *tour != "" || *motionStyle != "") {

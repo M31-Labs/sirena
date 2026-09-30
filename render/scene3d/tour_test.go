@@ -75,6 +75,27 @@ func TestNativeMotionControls(t *testing.T) {
 	if props.Scene.Objects[0].DriftSpeed != speed || props.Scene.Objects[0].ShiftY != distance {
 		t.Fatal("motion controls lost")
 	}
+	for _, obj := range props.Scene.Objects {
+		if obj.Kind == "lines" {
+			continue
+		}
+		found := false
+		for _, label := range props.Scene.Labels {
+			if label.ID != "label:"+obj.ID {
+				continue
+			}
+			found = true
+			if label.DriftSpeed != obj.DriftSpeed || label.DriftPhase != obj.DriftPhase || label.ShiftY != obj.ShiftY {
+				t.Fatalf("label %s does not follow native float", label.ID)
+			}
+			if label.Y <= obj.Y || label.Z <= obj.Z || label.Priority <= 0 || label.WhiteSpace != "pre" {
+				t.Fatalf("label %s lacks readable anchor or collision priority", label.ID)
+			}
+		}
+		if !found {
+			t.Fatalf("missing label for %s", obj.ID)
+		}
+	}
 	speed = 0
 	props.Scene = scene.SceneIR{}
 	data, err = Build(diagram(t), Options{MotionStyle: "float", MotionSpeed: &speed})

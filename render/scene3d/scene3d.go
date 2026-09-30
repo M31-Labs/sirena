@@ -168,7 +168,11 @@ func Build(lr *sirena.LayoutResult, opts Options) ([]byte, error) {
 			}
 		}
 
-		if err := emit(mesh, scene.Label{ID: "label:" + id, Target: id, Text: elementLabel(n), Shift: scene.Vec3(0, -height*.65, .5), Color: "#edf8f5", Background: "#101923", Font: "600 16px sans-serif", Collision: "shift"}); err != nil {
+		label := nodeLabel(id, elementLabel(n), height)
+		// GoSX resolves target anchors when lowering the scene. Mirror native drift
+		// so the label keeps following its mesh during browser animation.
+		label.Shift, label.DriftSpeed, label.DriftPhase = mesh.Drift, mesh.DriftSpeed, mesh.DriftPhase
+		if err := emit(mesh, label); err != nil {
 			return nil, err
 		}
 	}
@@ -198,7 +202,7 @@ func Build(lr *sirena.LayoutResult, opts Options) ([]byte, error) {
 			return nil, err
 		}
 		pos := point(placement.Bounds.Center())
-		if err := emit(scene.Mesh{ID: id, Geometry: scene.BoxGeometry{Width: placement.Bounds.Width() * scale, Height: placement.Bounds.Height() * scale, Depth: .3}, Material: scene.StandardMaterial{Color: "#879ca8"}, Position: pos}, scene.Label{ID: "label:" + id, Target: id, Text: placement.Summary.Label, Shift: scene.Vec3(0, -placement.Bounds.Height()*scale*.65, .5), Color: "#edf8f5"}); err != nil {
+		if err := emit(scene.Mesh{ID: id, Geometry: scene.BoxGeometry{Width: placement.Bounds.Width() * scale, Height: placement.Bounds.Height() * scale, Depth: .3}, Material: scene.StandardMaterial{Color: "#879ca8"}, Position: pos}, nodeLabel(id, placement.Summary.Label, placement.Bounds.Height()*scale)); err != nil {
 			return nil, err
 		}
 	}
@@ -281,7 +285,13 @@ func Build(lr *sirena.LayoutResult, opts Options) ([]byte, error) {
 			return nil, err
 		}
 		if route.Label != nil && route.Label.Text != "" {
-			if err := emit(scene.Label{ID: "label:" + id, Text: route.Label.Text, Position: point(route.Label.Anchor), Color: "#bacdd2", Font: "12px sans-serif", Background: "#101923"}); err != nil {
+			offsetY := 2.0
+			first, last := route.Points[0], route.Points[len(route.Points)-1]
+			if lr.Diagram != "sequence" && math.Abs(last.X-first.X) > math.Abs(last.Y-first.Y) {
+				// Horizontal relationships pass below the elevated node labels.
+				offsetY = 14
+			}
+			if err := emit(scene.Label{ID: "label:" + id, Text: route.Label.Text, Position: point(route.Label.Anchor), Color: "#bacdd2", Font: "12px sans-serif", Background: "#101923", AnchorX: .5, AnchorY: .5, OffsetY: offsetY, LineHeight: 16, WhiteSpace: "pre", MaxWidth: 320, MaxLines: 1}); err != nil {
 				return nil, err
 			}
 		}
@@ -318,6 +328,16 @@ func Build(lr *sirena.LayoutResult, opts Options) ([]byte, error) {
 	}
 	scene.ApplyShaderLib(payload["scene"].(map[string]any))
 	return json.MarshalIndent(payload, "", "  ")
+}
+
+func nodeLabel(id, text string, height float64) scene.Label {
+	return scene.Label{
+		ID: "label:" + id, Target: id, Text: text,
+		Position: scene.Vec3(0, height*.65, .5), Priority: 100,
+		Color: "#edf8f5", Background: "#101923", Font: "600 16px sans-serif",
+		AnchorX: .5, AnchorY: .5, WhiteSpace: "pre", MaxLines: 1, MaxWidth: 320,
+		Collision: "avoid",
+	}
 }
 
 func buildTimeline(ir scene.SceneIR, steps []Step) (Timeline, error) {
