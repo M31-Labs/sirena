@@ -50,6 +50,10 @@ func RunRender(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "Scene3D options require --scene3d")
 		return 2
 	}
+	if *shaderPath == "" && (*material != "" || *shaderTargets != "") {
+		fmt.Fprintln(stderr, "--material and --targets require --shader")
+		return 2
+	}
 
 	theme, err := svg.ThemeForName(*themeName)
 	if err != nil {

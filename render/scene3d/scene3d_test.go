@@ -71,7 +71,7 @@ func TestDiagramIsDeterministicAndRetainsGeometry(t *testing.T) {
 func TestShaderAndAbsoluteKeyframes(t *testing.T) {
 	x := 2.0
 	scale := 1.5
-	opts := Options{Shader: []byte(`material Ink { surface(geo) -> color { return rgb(geo.uv.x, 0.4, 0.8) } }`), Targets: []string{"api"}, Steps: []Step{{Label: "Layout"}, {Label: "Move", Patches: []Patch{{Target: "api", X: &x, Scale: &scale}}}, {Label: "Reset"}}}
+	opts := Options{Shader: []byte(`material Ink { surface(geo) -> color { return rgb(geo.uv.x, 0.4, 0.8) } }`), Material: "Ink", Targets: []string{"api"}, Steps: []Step{{Label: "Layout"}, {Label: "Move", Patches: []Patch{{Target: "api", X: &x, Scale: &scale}}}, {Label: "Reset"}}}
 	data, err := Build(diagram(t), opts)
 	if err != nil {
 		t.Fatal(err)
@@ -103,6 +103,14 @@ func TestShaderAndAbsoluteKeyframes(t *testing.T) {
 	opts.Targets = []string{"missing"}
 	if _, err := Build(diagram(t), opts); err == nil {
 		t.Fatal("unknown shader target accepted")
+	}
+}
+
+func TestShaderOptionsRequireSource(t *testing.T) {
+	for _, opts := range []Options{{Material: "Ink"}, {Targets: []string{"api"}}} {
+		if _, err := Build(diagram(t), opts); err == nil || !strings.Contains(err.Error(), "require shader source") {
+			t.Fatalf("shaderless selection was silently ignored: %v", err)
+		}
 	}
 }
 func mustJSON(v any) []byte {

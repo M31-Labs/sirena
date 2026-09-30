@@ -29,7 +29,7 @@ func TestRenderScene3DFromSirenaAndMermaid(t *testing.T) {
 	}
 }
 func TestScene3DRejectsInvalidOptionCombinations(t *testing.T) {
-	for _, args := range [][]string{{"--shader", "x.sel", "x.sir"}, {"--scene3d", "--interactive", "x.sir"}, {"--scene3d", "--workflow", "x.json", "x.sir"}} {
+	for _, args := range [][]string{{"--shader", "x.sel", "x.sir"}, {"--scene3d", "--interactive", "x.sir"}, {"--scene3d", "--workflow", "x.json", "x.sir"}, {"--scene3d", "--material", "Ink", "x.sir"}, {"--scene3d", "--targets", "api", "x.sir"}} {
 		var out, diagnostics bytes.Buffer
 		if code := RunRender(args, &out, &diagnostics); code != 2 {
 			t.Fatalf("%v: code=%d %s", args, code, diagnostics.String())

@@ -20,6 +20,8 @@ Use the JSON in gosx-slides: `<Scene3D Src="scenes/request.scene.json" />`.
 `--motion` adds slow node rotation; hidden surfaces pause through GoSX.
 `--material` selects a named Selena material, and `--targets` selects stable
 node identities (`sid` metadata, falling back to declaration names).
+`--material` and `--targets` require `--shader`; the CLI and renderer reject
+shaderless selections rather than silently leaving default materials in place.
 Shaders are compiled to GLSL and WGSL and shared through the scene shader library.
 Mermaid flowcharts can also use `--scene3d --infer`.
 

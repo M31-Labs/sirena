@@ -47,6 +47,9 @@ type Timeline struct {
 // It leaves the layout and IR untouched. Scene labels retain readable node and
 // relationship text; arrowheads preserve reverse and bidirectional relations.
 func Build(lr *sirena.LayoutResult, opts Options) ([]byte, error) {
+	if len(opts.Shader) == 0 && (opts.Material != "" || len(opts.Targets) > 0) {
+		return nil, fmt.Errorf("sirena scene3d: material and targets require shader source")
+	}
 	if lr == nil || lr.Bounds.Width() <= 0 || lr.Bounds.Height() <= 0 {
 		return nil, fmt.Errorf("sirena scene3d: a non-empty layout is required")
 	}
