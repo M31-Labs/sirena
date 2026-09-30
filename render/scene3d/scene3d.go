@@ -285,9 +285,11 @@ func Build(lr *sirena.LayoutResult, opts Options) ([]byte, error) {
 			return nil, err
 		}
 		if route.Label != nil && route.Label.Text != "" {
-			offsetY := 2.0
+			offsetY := -14.0
 			first, last := route.Points[0], route.Points[len(route.Points)-1]
-			if lr.Diagram != "sequence" && math.Abs(last.X-first.X) > math.Abs(last.Y-first.Y) {
+			if lr.Diagram == "sequence" {
+				offsetY = 2
+			} else if math.Abs(last.X-first.X) > math.Abs(last.Y-first.Y) {
 				// Horizontal relationships pass below the elevated node labels.
 				offsetY = 14
 			}
