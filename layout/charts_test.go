@@ -103,3 +103,25 @@ a -> b: depends_on`)
 		t.Fatal("invalid end accepted")
 	}
 }
+
+func TestMindmapLongCaptionsClearNodes(t *testing.T) {
+	rv := chartView(t, `service root
+service child
+root -> child: flow "A very long relationship caption with wide WWW letters that needs a much larger gutter"`)
+	lr, _, err := Render(rv, sirena.RenderOptions{Diagram: "mindmap"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	caption := lr.EdgeRoutes[0].Label
+	if caption == nil {
+		t.Fatal("caption lost")
+	}
+	for _, np := range lr.NodePlacements {
+		if caption.Bounds.Intersects(np.Bounds) {
+			t.Fatalf("caption overlaps %s: %+v", np.Node.Name, caption.Bounds)
+		}
+	}
+	if lr.NodePlacements[1].Bounds.Min.X-lr.NodePlacements[0].Bounds.Max.X < labelWidth(rv.Edges[0].Label)+32 {
+		t.Fatal("measured caption clearance was not reserved")
+	}
+}

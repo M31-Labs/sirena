@@ -67,7 +67,7 @@ func computeMindmap(rv *sirena.ResolvedView, seed [32]byte, metrics Metrics) (*s
 		return nil, fmt.Errorf("sirena: mindmap requires an acyclic parent-to-child forest")
 	}
 	for i, e := range rv.Elements {
-		x := float64(levels[i]) * (width + 100)
+		x := float64(levels[i]) * (width + gap)
 		lr.NodePlacements = append(lr.NodePlacements, &sirena.NodePlacement{Node: e, Bounds: sirena.Rect{Min: sirena.Point{X: x, Y: y[i]}, Max: sirena.Point{X: x + width, Y: y[i] + 40}}})
 	}
 	for _, edge := range rv.Edges {
