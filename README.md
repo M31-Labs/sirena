@@ -2,7 +2,7 @@
 
 A modernized diagram language and renderer. Arch/systems diagrams as the wedge, with a multi-file project model and a pure-Go layout engine — designed to be mdpp's native diagram surface. No JavaScript toolchain, no headless browser; pure Go end to end.
 
-**Status:** v0.2.0 release candidate, with native GoSX Scene3D export.
+**Status:** SVG and native GoSX Scene3D export, with architecture, sequence, and radial diagrams.
 
 Install from source with Go 1.26 or newer:
 
@@ -48,3 +48,22 @@ Defaults cap graphics at 30 FPS, 1.5 device pixel ratio, and two million pixels
 with adaptive quality. Large systems should select a view before rendering:
 the Scene3D adapter caps all emitted scene objects and labels at 2000, including
 nodes, edges, summaries, and nested boundary frames. Keyframes are capped at 128.
+
+## Diagram modes and presentation tours
+
+Choose `--diagram sequence` for ordered interactions and lifelines, or `--diagram radial` for a centered dependency diagram. Source `label` metadata is honored by layout and SVG as well as Scene3D; layout measures the actual bundled font, and SVG exposes accessible labels and directional arrows. Inline SVG styles are scoped so diagrams can use independent themes.
+
+Native Scene3D tours use `--tour nodes` or `--tour relationships`. They create bounded, absolute presentation keyframes automatically. `--motion-style spin|float`, `--motion-speed`, and float `--motion-distance` control native movement without a client animation loop. See [runnable examples](examples/diagrams/README.md) for authoring and the current flat-view and Mermaid ingestion limits.
+
+```sh
+sirena render --diagram sequence -o sequence.svg examples/diagrams/sequence.sir
+sirena render --diagram radial --scene3d --tour nodes --motion-style float \
+  -o radial.scene.json examples/diagrams/radial.sir
+```
+
+Run `sirena render --help` to discover every control. Node labels have collision
+priority over relationship captions and follow native float motion. Native labels
+use a single line capped at 320 pixels; choose concise labels and smaller views
+for presentation-sized diagrams. GoSX respects reduced-motion preferences.
+Boundary headers reserve space above their children, and SVG viewports include
+routed relationships and measured captions to prevent clipping.

@@ -1,0 +1,9 @@
+service scheduler { label: "Scheduler" }
+service api { label: "API" }
+queue jobs { label: "Job queue" }
+database db { label: "Storage" }
+service metrics { label: "Telemetry" }
+scheduler -> api: calls "requests"
+scheduler -> jobs: publishes "dispatch"
+scheduler -> db: reads "state"
+scheduler -> metrics: flow "metrics"

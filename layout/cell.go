@@ -1,6 +1,10 @@
 package layout
 
-import "m31labs.dev/sirena"
+import (
+	"math"
+
+	"m31labs.dev/sirena"
+)
 
 // cellItem is one node in a cell scope: either an element or a collapsed-
 // boundary summary. Both lay out as uniform-height nodes; a summary's
@@ -22,7 +26,7 @@ func (c cellItem) name() string {
 
 func (c cellItem) label() string {
 	if c.element != nil {
-		return c.element.Name
+		return c.element.DisplayLabel()
 	}
 	if c.summary != nil {
 		return c.summary.Label
@@ -140,17 +144,18 @@ func layoutBoundary(b *sirena.Boundary, rv *sirena.ResolvedView, included map[*s
 		childrenBounds = sirena.Rect{}
 	}
 
-	// Inset the content by padding so it sits inside the boundary box.
+	// Reserve a header row so the boundary title cannot overlap its children.
 	pad := boundaryPadding
-	shiftPlacements(nps, sps, pad, pad)
+	top := pad + 24
+	shiftPlacements(nps, sps, pad, top)
 	for _, c := range childBPs {
-		shiftBoundaryTree(c, pad, pad)
+		shiftBoundaryTree(c, pad, top)
 	}
-	childrenBounds = shiftRect(childrenBounds, pad, pad)
+	childrenBounds = shiftRect(childrenBounds, pad, top)
 
 	outer := sirena.Rect{
 		Min: sirena.Point{X: 0, Y: 0},
-		Max: sirena.Point{X: childrenBounds.Max.X + pad, Y: childrenBounds.Max.Y + pad},
+		Max: sirena.Point{X: math.Max(childrenBounds.Max.X+pad, metrics.TextWidth(b.DisplayLabel())+2*pad), Y: childrenBounds.Max.Y + pad},
 	}
 	bp := &sirena.BoundaryPlacement{
 		Boundary:       b,

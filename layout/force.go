@@ -20,7 +20,7 @@ func computeForce(rv *sirena.ResolvedView, seed [32]byte, metrics Metrics) *sire
 	labelByName := map[string]string{}
 	for _, e := range rv.Elements {
 		els = append(els, e)
-		labelByName[e.Name] = e.Name
+		labelByName[e.Name] = e.DisplayLabel()
 	}
 	for _, s := range rv.Summaries {
 		if s.Boundary == nil {

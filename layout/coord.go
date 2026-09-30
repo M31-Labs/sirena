@@ -50,7 +50,7 @@ func (m Metrics) TextWidth(s string) float64 {
 	if m.WidthOf != nil {
 		return m.WidthOf(s)
 	}
-	return defaultGlyphWidth * float64(len([]rune(s)))
+	return labelWidth(s)
 }
 
 // assignCoords assigns each element an absolute Rect using the

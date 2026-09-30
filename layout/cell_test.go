@@ -6,6 +6,18 @@ import (
 	"m31labs.dev/sirena"
 )
 
+func TestBoundaryReservesReadableHeader(t *testing.T) {
+	actor := elem("api")
+	boundary := &sirena.Boundary{Name: "region", Metadata: map[string]sirena.Value{"label": sirena.String{Value: "A region with a descriptive heading"}}, Children: []sirena.Node{actor}}
+	bp, nodes, _ := layoutBoundary(boundary, &sirena.ResolvedView{}, nil, DefaultMetrics())
+	if len(nodes) != 1 || nodes[0].Bounds.Min.Y-bp.Bounds.Min.Y < 32 {
+		t.Fatal("boundary heading overlaps the first child row")
+	}
+	if bp.Bounds.Width() < DefaultMetrics().TextWidth(boundary.DisplayLabel())+2*boundaryPadding {
+		t.Fatal("boundary heading exceeds its frame")
+	}
+}
+
 func TestCell_FiveNodeGraph(t *testing.T) {
 	a, b, c, d, e := elem("A"), elem("B"), elem("C"), elem("D"), elem("E")
 	items := []cellItem{{element: a}, {element: b}, {element: c}, {element: d}, {element: e}}
