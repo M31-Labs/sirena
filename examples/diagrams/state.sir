@@ -1,0 +1,6 @@
+service idle { label: "Idle" state: "initial" }
+service running { label: "Running" }
+service done { label: "Complete" state: "final" }
+idle -> running: flow "start"
+running -> idle: flow "retry"
+running -> done: flow "finish"

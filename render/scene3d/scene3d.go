@@ -30,15 +30,20 @@ type Options struct {
 // Step is an absolute keyframe. Missing fields restore the original layout,
 // making direct seeks and backwards navigation independent of prior steps.
 type Step struct {
-	Label   string  `json:"label"`
-	Patches []Patch `json:"patches,omitempty"`
+	Label   string   `json:"label"`
+	Patches []Patch  `json:"patches,omitempty"`
+	Focus   []string `json:"focus,omitempty"`
+	Reveal  []string `json:"reveal,omitempty"`
+	Trace   []string `json:"trace,omitempty"`
 }
 type Patch struct {
-	Target string   `json:"target"`
-	X      *float64 `json:"x,omitempty"`
-	Y      *float64 `json:"y,omitempty"`
-	Z      *float64 `json:"z,omitempty"`
-	Scale  *float64 `json:"scale,omitempty"`
+	Target  string   `json:"target"`
+	Visible *bool    `json:"visible,omitempty"`
+	Color   *string  `json:"color,omitempty"`
+	X       *float64 `json:"x,omitempty"`
+	Y       *float64 `json:"y,omitempty"`
+	Z       *float64 `json:"z,omitempty"`
+	Scale   *float64 `json:"scale,omitempty"`
 }
 type Frame struct {
 	Label    string          `json:"label"`
@@ -304,7 +309,11 @@ func Build(lr *sirena.LayoutResult, opts Options) ([]byte, error) {
 		return nil, err
 	}
 	if len(opts.Steps) > 0 {
-		timeline, err := buildTimeline(props.SceneIR(), opts.Steps)
+		steps, err := choreographySteps(lr, opts.Steps)
+		if err != nil {
+			return nil, err
+		}
+		timeline, err := buildTimeline(props.SceneIR(), steps)
 		if err != nil {
 			return nil, err
 		}
@@ -327,6 +336,15 @@ func Build(lr *sirena.LayoutResult, opts Options) ([]byte, error) {
 			return nil, fmt.Errorf("sirena scene3d: tour exceeds 4 MiB; select a smaller view")
 		}
 		payload["slideSteps"] = timeline
+	}
+	if timeline, ok := payload["slideSteps"]; ok {
+		data, err := json.Marshal(timeline)
+		if err != nil {
+			return nil, err
+		}
+		if len(data) > 4<<20 {
+			return nil, fmt.Errorf("sirena scene3d: presentation keyframes exceed 4 MiB; select a smaller view or fewer steps")
+		}
 	}
 	scene.ApplyShaderLib(payload["scene"].(map[string]any))
 	return json.MarshalIndent(payload, "", "  ")
@@ -355,6 +373,7 @@ func buildTimeline(ir scene.SceneIR, steps []Step) (Timeline, error) {
 		objects[obj.ID] = obj
 	}
 	targets := map[string]bool{}
+	replacements := map[string]bool{}
 	for _, step := range steps {
 		for _, patch := range step.Patches {
 			if _, ok := objects[patch.Target]; !ok {
@@ -369,6 +388,9 @@ func buildTimeline(ir scene.SceneIR, steps []Step) (Timeline, error) {
 				return Timeline{}, fmt.Errorf("sirena scene3d: scale must be positive")
 			}
 			targets[patch.Target] = true
+			if patch.Visible != nil || patch.Color != nil {
+				replacements[patch.Target] = true
+			}
 		}
 	}
 	ids := make([]string, 0, len(targets))
@@ -389,6 +411,19 @@ func buildTimeline(ir scene.SceneIR, steps []Step) (Timeline, error) {
 		for _, id := range ids {
 			obj := objects[id]
 			patch := patches[id]
+			if replacements[id] {
+				frame.Commands = append(frame.Commands, scene.Command{Kind: scene.CommandRemoveObject, ObjectID: id})
+				if patch.Visible != nil && !*patch.Visible {
+					if label, ok := labels["label:"+id]; ok {
+						frame.Commands = append(frame.Commands, scene.Command{Kind: scene.CommandRemoveObject, ObjectID: label.ID})
+					}
+					continue
+				}
+				if patch.Color != nil {
+					obj.Color = *patch.Color
+				}
+				frame.Commands = append(frame.Commands, scene.CreateObjectCommand(obj))
+			}
 			x, y, z := obj.X, obj.Y, obj.Z
 			if patch.X != nil {
 				x = *patch.X
@@ -415,6 +450,8 @@ func buildTimeline(ir scene.SceneIR, steps []Step) (Timeline, error) {
 				sz *= *patch.Scale
 			}
 			frame.Commands = append(frame.Commands, scene.Command{Kind: scene.CommandSetTransform, ObjectID: id, Data: map[string]any{"x": x, "y": y, "z": z, "rotationX": obj.RotationX, "rotationY": obj.RotationY, "rotationZ": obj.RotationZ, "scaleX": sx, "scaleY": sy, "scaleZ": sz}})
+			// Labels are separate projected objects. Every visible frame recreates
+			// the original label, including a reveal after a hidden frame.
 			if label, ok := labels["label:"+id]; ok {
 				label.X += x - obj.X
 				label.Y += y - obj.Y

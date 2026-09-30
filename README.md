@@ -49,6 +49,53 @@ with adaptive quality. Large systems should select a view before rendering:
 the Scene3D adapter caps all emitted scene objects and labels at 2000, including
 nodes, edges, summaries, and nested boundary frames. Keyframes are capped at 128.
 
+
+### Diagram families and semantic presentation beats
+
+`render --diagram` supports **architecture, sequence, radial, state, class, er,
+swimlane, and timeline**. The same declaration identities and relationships
+survive SVG and Scene3D export. These are native Sirena layouts; Mermaid
+import remains limited to flowcharts.
+
+- `state`: rounded states with `state: "initial"` / `state: "final"` markers.
+- `class` / `er`: measured record compartments. Use `fields: "id: UUID; name: string"`
+  and optionally `methods: "save(); validate()"`; relationship labels carry roles
+  and cardinalities, such as `"1 to many"`.
+- `swimlane`: `lane: "Operations"` groups tasks; declaration order defines the
+  progression across lanes.
+- `timeline`: numeric `start: 2 duration: 5` values share one time unit. Bar widths
+  preserve duration ratios; names remain outside bars. Dates are not parsed.
+
+Copy the runnable sources in `examples/diagrams/`. Non-architecture layouts
+require flat views and reject nested boundaries rather than dropping them.
+
+Scene3D steps accept semantic actions as well as explicit transform patches:
+
+```json
+[
+  {"label":"Overview"},
+  {"label":"Request","reveal":["browser","api"],"trace":["browser->api"]},
+  {"label":"Worker","focus":["worker"]},
+  {"label":"Overview"}
+]
+```
+
+```sh
+sirena render --scene3d --steps examples/scene3d/choreography.json \
+  -o request.scene.json examples/scene3d/request.sir
+```
+
+`focus` emphasizes selected node identities, `reveal` lists the complete visible
+set (and shows relationships between visible endpoints), and `trace` highlights
+relationships. Targets accept names or stable `sid` values. Repeated relationships
+need their unique edge ID (`edge:0`, etc.) instead of an ambiguous `from->to` alias.
+Each beat is an absolute pose; omitted actions restore the original state, so
+links, reverse navigation, and replay do not depend on earlier steps. Timelines
+are bounded to 128 frames / 4 MiB.
+
+SVG nodes expose `data-sirena-id` and `data-morph-id` for selection and shared
+transitions in hosts such as gosx-slides. `sirena version` reports the CLI release.
+
 ## Diagram modes and presentation tours
 
 Choose `--diagram sequence` for ordered interactions and lifelines, or `--diagram radial` for a centered dependency diagram. Source `label` metadata is honored by layout and SVG as well as Scene3D; layout measures the actual bundled font, and SVG exposes accessible labels and directional arrows. Inline SVG styles are scoped so diagrams can use independent themes.

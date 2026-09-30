@@ -7,7 +7,11 @@ type LifelinePlacement struct {
 }
 
 func ValidDiagram(name string) bool {
-	return name == "architecture" || name == "sequence" || name == "radial"
+	switch name {
+	case "architecture", "sequence", "radial", "state", "class", "er", "swimlane", "timeline":
+		return true
+	}
+	return false
 }
 
 // DiagramName reads the view's diagram hint without mutating source IR.

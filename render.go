@@ -36,7 +36,8 @@ type RenderOptions struct {
 	// over budget. Permissive mode (the zero value) still surfaces the
 	// report so callers can warn, but does not abort.
 	StrictBudget bool
-	// Diagram selects architecture (default), sequence, or radial geometry.
+	// Diagram selects architecture (default), sequence, radial, state, class,
+	// er, swimlane, or timeline geometry.
 	// Empty preserves the view's layout { diagram: ... } hint.
 	Diagram string
 }
@@ -114,7 +115,7 @@ var ErrBudgetExceeded = errors.New("sirena: view budget exceeded; see BudgetRepo
 func Render(rv *ResolvedView, opts RenderOptions) (*LayoutResult, *BudgetReport, error) {
 	if opts.Diagram != "" {
 		if !ValidDiagram(opts.Diagram) {
-			return nil, nil, errors.New("sirena: diagram must be architecture, sequence, or radial")
+			return nil, nil, errors.New("sirena: diagram must be architecture, sequence, radial, state, class, er, swimlane, or timeline")
 		}
 		rv = WithDiagram(rv, opts.Diagram)
 	}

@@ -1,0 +1,3 @@
+database customer { label: "Customer" fields: "PK id: UUID; email: string" }
+database order { label: "Order" fields: "PK id: UUID; FK customer_id: UUID; total: decimal" }
+customer -> order: flow "1 to many"

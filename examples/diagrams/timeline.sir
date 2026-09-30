@@ -1,0 +1,7 @@
+service design { label: "Design" start: 0 duration: 3 }
+service build { label: "Build" start: 2 duration: 5 }
+service test { label: "Validate" start: 6 duration: 2 }
+service release { label: "Release" start: 8 duration: 1 }
+design -> build: depends_on "handoff"
+build -> test: depends_on "ready"
+test -> release: depends_on "approved"

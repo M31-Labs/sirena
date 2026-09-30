@@ -1,0 +1,3 @@
+service order { label: "Order" fields: "id: UUID; total: Money" methods: "submit(); cancel()" }
+service item { label: "OrderItem" fields: "sku: string; quantity: int" methods: "subtotal()" }
+order -> item: flow "1 to many"

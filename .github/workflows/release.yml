@@ -1,0 +1,66 @@
+name: Release binaries
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [linux, darwin, windows]
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: go.mod
+      - name: Build and package
+        env:
+          CGO_ENABLED: '0'
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: |
+          mkdir -p package artifacts
+          extension=''
+          if [ "$GOOS" = windows ]; then extension='.exe'; fi
+          go build -trimpath -ldflags "-s -w -X main.version=$RELEASE_VERSION" -o "package/sirena$extension" ./cmd/sirena
+          cp README.md LICENSE package/
+          name="sirena-$RELEASE_VERSION-$GOOS-$GOARCH"
+          if [ "$GOOS" = windows ]; then
+            zip -j "artifacts/$name.zip" package/*
+          else
+            tar -czf "artifacts/$name.tar.gz" -C package .
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sirena-${{ matrix.os }}-${{ matrix.arch }}
+          path: artifacts/*
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: sirena-*
+          merge-multiple: true
+          path: artifacts
+      - name: Publish release with checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ github.ref_name }}
+          RELEASE_REPO: ${{ github.repository }}
+        run: |
+          cd artifacts
+          sha256sum *.tar.gz *.zip > SHA256SUMS.txt
+          gh release create "$RELEASE_VERSION" --repo "$RELEASE_REPO" --verify-tag --title "sirena $RELEASE_VERSION" --generate-notes ./*

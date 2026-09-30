@@ -82,13 +82,22 @@ func Compute(rv *sirena.ResolvedView, opts LayoutOptions) (*sirena.LayoutResult,
 	metrics := DefaultMetrics()
 	diagram := sirena.DiagramName(rv)
 	if !sirena.ValidDiagram(diagram) {
-		return nil, fmt.Errorf("sirena: unknown diagram %q (want architecture, sequence, or radial)", diagram)
+		return nil, fmt.Errorf("sirena: unknown diagram %q (want architecture, sequence, radial, state, class, er, swimlane, or timeline)", diagram)
 	}
 	if diagram == "sequence" {
 		return computeSequence(rv, seed, metrics)
 	}
 	if diagram == "radial" {
 		return computeRadial(rv, seed, metrics)
+	}
+
+	switch diagram {
+	case "state", "class", "er":
+		return computeCards(rv, seed, metrics, diagram)
+	case "swimlane":
+		return computeSwimlane(rv, seed, metrics)
+	case "timeline":
+		return computeTimeline(rv, seed, metrics)
 	}
 
 	// The force preset skips the cell/skeleton pipeline entirely.

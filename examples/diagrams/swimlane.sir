@@ -1,0 +1,7 @@
+client submit { label: "Submit request" lane: "Customer" }
+service review { label: "Review request" lane: "Operations" }
+service approve { label: "Approve" lane: "Operations" }
+client notify { label: "Receive notification" lane: "Customer" }
+submit -> review: flow "request"
+review -> approve: flow "validated"
+approve -> notify: flow "result"
