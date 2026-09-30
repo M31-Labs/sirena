@@ -53,7 +53,7 @@ func Render(lr *sirena.LayoutResult, theme *Theme) ([]byte, error) {
 	writeLifelines(&b, lr.Lifelines)
 	writeBoundaries(&b, lr.BoundaryPlacements)
 	writeEdges(&b, lr.EdgeRoutes, markerPrefix)
-	writeNodes(&b, lr.NodePlacements)
+	writeNodes(&b, lr.NodePlacements, lr.Diagram)
 	writeSummaries(&b, lr.SummaryPlacements)
 
 	b.WriteString("</svg>\n")
@@ -158,7 +158,7 @@ func writeBoundaries(b *bytes.Buffer, bps []*sirena.BoundaryPlacement) {
 	}
 }
 
-func writeNodes(b *bytes.Buffer, nps []*sirena.NodePlacement) {
+func writeNodes(b *bytes.Buffer, nps []*sirena.NodePlacement, diagram string) {
 	sorted := append([]*sirena.NodePlacement(nil), nps...)
 	sort.SliceStable(sorted, func(i, j int) bool { return rectLess(sorted[i].Bounds, sorted[j].Bounds) })
 	for _, np := range sorted {
@@ -169,10 +169,34 @@ func writeNodes(b *bytes.Buffer, nps []*sirena.NodePlacement) {
 			name = np.Node.DisplayLabel()
 		}
 		r := np.Bounds
-		fmt.Fprintf(b, `<g class="node %s">`, kind)
-		fmt.Fprintf(b, `<rect x="%s" y="%s" width="%s" height="%s" rx="4"/>`,
-			num(r.Min.X), num(r.Min.Y), num(r.Width()), num(r.Height()))
-		writeLabel(b, name, r.Center())
+		identity := ""
+		if np.Node != nil {
+			identity = np.Node.Name
+			if sid, ok := np.Node.Metadata["sid"].(sirena.String); ok && sid.Value != "" {
+				identity = sid.Value
+			}
+		}
+		fmt.Fprintf(b, `<g class="node %s" data-sirena-id="%s" data-morph-id="%s">`, kind, html.EscapeString(identity), html.EscapeString(identity))
+		radius := 4.0
+		if diagram == "state" {
+			radius = r.Height() / 2
+		}
+		fmt.Fprintf(b, `<rect x="%s" y="%s" width="%s" height="%s" rx="%s"/>`,
+			num(r.Min.X), num(r.Min.Y), num(r.Width()), num(r.Height()), num(radius))
+		if diagram == "state" {
+			writeStateMarker(b, np)
+		}
+		if diagram == "class" || diagram == "er" {
+			writeCompartments(b, np)
+		} else if diagram == "timeline" {
+			writeLabel(b, name, sirena.Point{X: r.Min.X - labelHalf(name) - 12, Y: r.Center().Y})
+		} else {
+			center := r.Center()
+			if diagram == "state" {
+				center.X += 8
+			}
+			writeLabel(b, name, center)
+		}
 		b.WriteString("</g>\n")
 	}
 }

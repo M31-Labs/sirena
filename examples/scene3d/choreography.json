@@ -1,0 +1,7 @@
+[
+  {"label":"Overview"},
+  {"label":"Request enters","reveal":["browser","api"],"trace":["browser->api"]},
+  {"label":"Focus the API","focus":["api"]},
+  {"label":"Persist storage","focus":["worker","db"],"trace":["worker->db"]},
+  {"label":"Overview"}
+]

@@ -21,6 +21,8 @@ import (
 	"os"
 )
 
+var version = "v0.4.0"
+
 func main() {
 	if len(os.Args) < 2 {
 		printUsage(os.Stderr)
@@ -30,6 +32,8 @@ func main() {
 	args := os.Args[2:]
 	exit := 0
 	switch sub {
+	case "version", "--version":
+		fmt.Fprintln(os.Stdout, "sirena "+version)
 	case "parse":
 		exit = RunParse(args, os.Stdout, os.Stderr)
 	case "fmt":
