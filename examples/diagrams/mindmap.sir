@@ -1,0 +1,11 @@
+service story { label: "A compelling story" }
+service context { label: "Set the context" }
+service evidence { label: "Show the evidence" }
+service change { label: "Make the change" }
+service benchmark { label: "Measured performance" }
+service demo { label: "Interactive demonstration" }
+story -> context: flow
+story -> evidence: flow
+story -> change: flow
+evidence -> benchmark: flow
+evidence -> demo: flow

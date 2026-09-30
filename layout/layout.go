@@ -82,7 +82,7 @@ func Compute(rv *sirena.ResolvedView, opts LayoutOptions) (*sirena.LayoutResult,
 	metrics := DefaultMetrics()
 	diagram := sirena.DiagramName(rv)
 	if !sirena.ValidDiagram(diagram) {
-		return nil, fmt.Errorf("sirena: unknown diagram %q (want architecture, sequence, radial, state, class, er, swimlane, or timeline)", diagram)
+		return nil, fmt.Errorf("sirena: unknown diagram %q (want architecture, sequence, radial, state, class, er, swimlane, timeline, mindmap, bar, pie, or gantt)", diagram)
 	}
 	if diagram == "sequence" {
 		return computeSequence(rv, seed, metrics)
@@ -96,6 +96,12 @@ func Compute(rv *sirena.ResolvedView, opts LayoutOptions) (*sirena.LayoutResult,
 		return computeCards(rv, seed, metrics, diagram)
 	case "swimlane":
 		return computeSwimlane(rv, seed, metrics)
+	case "mindmap":
+		return computeMindmap(rv, seed, metrics)
+	case "bar", "pie":
+		return computeChart(rv, seed, diagram)
+	case "gantt":
+		return computeGantt(rv, seed, metrics)
 	case "timeline":
 		return computeTimeline(rv, seed, metrics)
 	}

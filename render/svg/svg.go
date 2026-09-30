@@ -42,7 +42,8 @@ func Render(lr *sirena.LayoutResult, theme *Theme) ([]byte, error) {
 	w := bounds.Width() + 2*canvasMargin
 	h := bounds.Height() + 2*canvasMargin
 
-	var b bytes.Buffer
+	var b svgBuffer
+	b.glyphs = make(map[string]string)
 	b.WriteString(`<?xml version="1.0" encoding="UTF-8"?>` + "\n")
 	fmt.Fprintf(&b, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="%s %s %s %s" width="%s" height="%s" data-sirena-theme="%s">`+"\n",
 		num(vbX), num(vbY), num(w), num(h), num(w), num(h), themeScope(theme))
@@ -50,12 +51,24 @@ func Render(lr *sirena.LayoutResult, theme *Theme) ([]byte, error) {
 	markerPrefix := "sirena-arrow-" + themeScope(theme)
 	writeMarkers(&b, lr.EdgeRoutes, markerPrefix)
 
+	if lr.Diagram == "gantt" {
+		writeCalendarGrid(&b, lr)
+	}
 	writeLifelines(&b, lr.Lifelines)
 	writeBoundaries(&b, lr.BoundaryPlacements)
 	writeEdges(&b, lr.EdgeRoutes, markerPrefix)
-	writeNodes(&b, lr.NodePlacements, lr.Diagram)
+	if lr.Diagram == "bar" || lr.Diagram == "pie" {
+		writeCharts(&b, lr)
+	} else {
+		writeNodes(&b, lr.NodePlacements, lr.Diagram, lr.ChartLabelX)
+	}
+	if lr.Diagram == "gantt" {
+		writeCalendar(&b, lr)
+	}
+
 	writeSummaries(&b, lr.SummaryPlacements)
 
+	b.writeGlyphs()
 	b.WriteString("</svg>\n")
 	return b.Bytes(), nil
 }
@@ -64,6 +77,9 @@ func Render(lr *sirena.LayoutResult, theme *Theme) ([]byte, error) {
 // layout bounds describe boxes; a relationship caption can extend beyond them.
 func svgBounds(lr *sirena.LayoutResult) sirena.Rect {
 	bounds := lr.Bounds
+	if lr.Diagram == "gantt" {
+		bounds.Max.X = max(bounds.Max.X, lr.ChartBaseline+690)
+	}
 	include := func(p sirena.Point) {
 		bounds.Min.X, bounds.Min.Y = min(bounds.Min.X, p.X), min(bounds.Min.Y, p.Y)
 		bounds.Max.X, bounds.Max.Y = max(bounds.Max.X, p.X), max(bounds.Max.Y, p.Y)
@@ -86,7 +102,7 @@ func svgBounds(lr *sirena.LayoutResult) sirena.Rect {
 
 // writeStyle emits the :root token declarations (sorted) followed by the
 // fixed class-rule set.
-func writeStyle(b *bytes.Buffer, theme *Theme) {
+func writeStyle(b *svgBuffer, theme *Theme) {
 	b.WriteString("<style>\n")
 	selector := `svg[data-sirena-theme="` + themeScope(theme) + `"]`
 	b.WriteString(selector + " { background: var(--sirena-bg);\n")
@@ -114,13 +130,13 @@ type boundaryAtDepth struct {
 	depth int
 }
 
-func writeLifelines(b *bytes.Buffer, lines []sirena.LifelinePlacement) {
+func writeLifelines(b *svgBuffer, lines []sirena.LifelinePlacement) {
 	for _, line := range lines {
 		fmt.Fprintf(b, `<path class="lifeline" d="M%s %sL%s %s" fill="none" stroke="var(--sirena-stroke)" stroke-width="1" stroke-dasharray="4 5"/>`, num(line.From.X), num(line.From.Y), num(line.To.X), num(line.To.Y))
 	}
 }
 
-func writeBoundaries(b *bytes.Buffer, bps []*sirena.BoundaryPlacement) {
+func writeBoundaries(b *svgBuffer, bps []*sirena.BoundaryPlacement) {
 	var flat []boundaryAtDepth
 	var walk func([]*sirena.BoundaryPlacement, int)
 	walk = func(list []*sirena.BoundaryPlacement, depth int) {
@@ -158,7 +174,7 @@ func writeBoundaries(b *bytes.Buffer, bps []*sirena.BoundaryPlacement) {
 	}
 }
 
-func writeNodes(b *bytes.Buffer, nps []*sirena.NodePlacement, diagram string) {
+func writeNodes(b *svgBuffer, nps []*sirena.NodePlacement, diagram string, labelX float64) {
 	sorted := append([]*sirena.NodePlacement(nil), nps...)
 	sort.SliceStable(sorted, func(i, j int) bool { return rectLess(sorted[i].Bounds, sorted[j].Bounds) })
 	for _, np := range sorted {
@@ -188,8 +204,8 @@ func writeNodes(b *bytes.Buffer, nps []*sirena.NodePlacement, diagram string) {
 		}
 		if diagram == "class" || diagram == "er" {
 			writeCompartments(b, np)
-		} else if diagram == "timeline" {
-			writeLabel(b, name, sirena.Point{X: r.Min.X - labelHalf(name) - 12, Y: r.Center().Y})
+		} else if diagram == "timeline" || diagram == "gantt" {
+			writeLabel(b, name, sirena.Point{X: labelX - labelHalf(name), Y: r.Center().Y})
 		} else {
 			center := r.Center()
 			if diagram == "state" {
@@ -201,7 +217,7 @@ func writeNodes(b *bytes.Buffer, nps []*sirena.NodePlacement, diagram string) {
 	}
 }
 
-func writeSummaries(b *bytes.Buffer, sps []*sirena.SummaryPlacement) {
+func writeSummaries(b *svgBuffer, sps []*sirena.SummaryPlacement) {
 	sorted := append([]*sirena.SummaryPlacement(nil), sps...)
 	sort.SliceStable(sorted, func(i, j int) bool { return rectLess(sorted[i].Bounds, sorted[j].Bounds) })
 	for _, sp := range sorted {
@@ -218,7 +234,7 @@ func writeSummaries(b *bytes.Buffer, sps []*sirena.SummaryPlacement) {
 	}
 }
 
-func writeEdges(b *bytes.Buffer, routes []*sirena.EdgeRoute, marker string) {
+func writeEdges(b *svgBuffer, routes []*sirena.EdgeRoute, marker string) {
 	sorted := append([]*sirena.EdgeRoute(nil), routes...)
 	sort.SliceStable(sorted, func(i, j int) bool { return edgeRouteLess(sorted[i], sorted[j]) })
 	for _, er := range sorted {
@@ -263,7 +279,7 @@ func edgeMarkerKind(edge *sirena.Edge) string {
 	return edge.Kind.String()
 }
 
-func writeMarkers(b *bytes.Buffer, routes []*sirena.EdgeRoute, prefix string) {
+func writeMarkers(b *svgBuffer, routes []*sirena.EdgeRoute, prefix string) {
 	used := map[string]bool{}
 	for _, route := range routes {
 		if route != nil && route.Edge != nil && len(route.Points) >= 2 {
@@ -289,7 +305,7 @@ func writeMarkers(b *bytes.Buffer, routes []*sirena.EdgeRoute, prefix string) {
 // The bundled glyph outlines are already in SVG's Y-down orientation (sfnt's
 // native output), so no Y flip is applied — scaling by a positive factor
 // keeps text upright.
-func writeLabel(b *bytes.Buffer, text string, center sirena.Point) {
+func writeLabel(b *svgBuffer, text string, center sirena.Point) {
 	if text == "" {
 		return
 	}
@@ -302,8 +318,8 @@ func writeLabel(b *bytes.Buffer, text string, center sirena.Point) {
 	for _, r := range text {
 		g := font.Lookup(r)
 		if g.Path != "" {
-			fmt.Fprintf(b, `<path d="%s" transform="translate(%s %s) scale(%s %s)"/>`,
-				g.Path, num(penX), num(baseline), num(scale), num(scale))
+			fmt.Fprintf(b, `<use href="#%s" transform="translate(%s %s) scale(%s %s)"/>`,
+				b.glyphID(g.Path), num(penX), num(baseline), num(scale), num(scale))
 		}
 		penX += g.Advance * scale
 	}
@@ -369,11 +385,43 @@ const classRules = `.boundary rect { fill: none; stroke: var(--sirena-stroke); s
 .edge.kind-publishes > path { stroke: var(--sirena-edge-stroke-publishes); }
 .edge.kind-subscribes > path { stroke: var(--sirena-edge-stroke-subscribes); }
 .edge.kind-depends_on > path { stroke: var(--sirena-edge-stroke-depends-on); }
-.label path { fill: var(--sirena-label-fill); stroke: none; }
+.label { fill: var(--sirena-label-fill); stroke: none; }
 `
 
 func themeScope(theme *Theme) string {
 	data, _ := json.Marshal(theme.Tokens)
 	sum := sha256.Sum256(data)
 	return fmt.Sprintf("%x", sum[:8])
+}
+
+// Each outline is emitted once per document, instead of once per character.
+// Content-derived IDs keep independent diagrams safe when embedded together.
+type svgBuffer struct {
+	bytes.Buffer
+	glyphs map[string]string
+}
+
+func (b *svgBuffer) glyphID(path string) string {
+	if b.glyphs == nil {
+		b.glyphs = make(map[string]string)
+	}
+	if id, ok := b.glyphs[path]; ok {
+		return id
+	}
+	sum := sha256.Sum256([]byte(path))
+	id := fmt.Sprintf("sirena-glyph-%x", sum[:12])
+	b.glyphs[path] = id
+	return id
+}
+func (b *svgBuffer) writeGlyphs() {
+	paths := make([]string, 0, len(b.glyphs))
+	for path := range b.glyphs {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	b.WriteString("<defs>")
+	for _, path := range paths {
+		fmt.Fprintf(&b.Buffer, `<path id="%s" d="%s"/>`, b.glyphs[path], path)
+	}
+	b.WriteString("</defs>\n")
 }

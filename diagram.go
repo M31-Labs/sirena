@@ -8,7 +8,7 @@ type LifelinePlacement struct {
 
 func ValidDiagram(name string) bool {
 	switch name {
-	case "architecture", "sequence", "radial", "state", "class", "er", "swimlane", "timeline":
+	case "architecture", "sequence", "radial", "state", "class", "er", "swimlane", "timeline", "mindmap", "bar", "pie", "gantt":
 		return true
 	}
 	return false
@@ -53,4 +53,11 @@ func WithDiagram(rv *ResolvedView, name string) *ResolvedView {
 	source.Layout = &layout
 	copy.Source = &source
 	return &copy
+}
+
+// PieSlicePlacement carries data geometry independently of its legend row.
+type PieSlicePlacement struct {
+	Node                                *Element
+	Center                              Point
+	Radius, Start, End, Value, Fraction float64
 }

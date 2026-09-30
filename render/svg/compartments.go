@@ -1,13 +1,12 @@
 package svg
 
 import (
-	"bytes"
 	"fmt"
 	"m31labs.dev/sirena"
 	"strings"
 )
 
-func writeCompartments(b *bytes.Buffer, np *sirena.NodePlacement) {
+func writeCompartments(b *svgBuffer, np *sirena.NodePlacement) {
 	r := np.Bounds
 	writeLabel(b, np.Node.DisplayLabel(), sirena.Point{X: r.Center().X, Y: r.Min.Y + 20})
 	y := r.Min.Y + 40
@@ -30,7 +29,7 @@ func writeCompartments(b *bytes.Buffer, np *sirena.NodePlacement) {
 	}
 }
 
-func writeStateMarker(b *bytes.Buffer, np *sirena.NodePlacement) {
+func writeStateMarker(b *svgBuffer, np *sirena.NodePlacement) {
 	value, _ := np.Node.Metadata["state"].(sirena.String)
 	if value.Value != "initial" && value.Value != "final" {
 		return

@@ -14,3 +14,21 @@ Embed the Scene3D JSON in gosx-slides with `<Scene3D Src="sequence.scene.json" /
 `--motion` retains spin. `--motion-style spin|float` selects native GoSX motion; speed is radians/second and float distance is world units. Zero speed disables movement. GoSX handles reduced motion and pauses hidden surfaces. Sequence scenes disable drag rotation to preserve time-row readability. Tours are capped at 126 focus steps and 4 MiB of serialized keyframes. Relationship routes retain their original layout while actors are emphasized.
 
 For a named Sirena view, `layout { diagram: sequence }` or `layout { diagram: radial }` selects the mode without a CLI override. This does not add Mermaid sequence syntax ingestion; Mermaid flowcharts can use either layout through `--diagram`.
+
+### Trees, values, and calendar dates
+
+```sh
+sirena render --diagram mindmap -o mindmap.svg examples/diagrams/mindmap.sir
+sirena render --diagram bar -o bar.svg examples/diagrams/bar.sir
+sirena render --diagram pie -o pie.svg examples/diagrams/pie.sir
+sirena render --diagram gantt -o gantt.svg examples/diagrams/gantt.sir
+sirena render --diagram mindmap --scene3d --tour nodes --motion-style float \
+  -o mindmap.scene.json examples/diagrams/mindmap.sir
+```
+
+Mindmaps require an acyclic parent-to-child forest with at most one parent per
+node. Values must be finite numbers within ±1e9; bars include negative values,
+while pie needs a positive total and non-negative values. Charts reject
+relationships rather than silently dropping them. Pie supports at most 100
+slices and SVG export only. Gantt reads ISO dates, measures real calendar days,
+and treats `end` as exclusive; all tasks must fit within a 100-year range.

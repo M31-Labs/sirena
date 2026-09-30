@@ -144,6 +144,8 @@ func computeTimeline(rv *sirena.ResolvedView, seed [32]byte, metrics Metrics) (*
 		labelSpace = math.Max(labelSpace, labelWidth(e.DisplayLabel())+32)
 	}
 	unit := 640 / maxEnd
+	lr.ChartBaseline = labelSpace
+	lr.ChartLabelX = labelSpace - 12
 	for i, e := range rv.Elements {
 		x, y := labelSpace+starts[i]*unit, 48+float64(i)*56
 		lr.NodePlacements = append(lr.NodePlacements, &sirena.NodePlacement{Node: e, Bounds: sirena.Rect{Min: sirena.Point{X: x, Y: y}, Max: sirena.Point{X: x + durations[i]*unit, Y: y + 28}}})
