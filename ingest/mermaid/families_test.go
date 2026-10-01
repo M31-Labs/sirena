@@ -39,3 +39,19 @@ func TestUnsupportedFamilySyntaxIsDiagnosedAtSource(t *testing.T) {
 		t.Fatalf("invalid syntax silently lost: %v %+v", err, diags)
 	}
 }
+func TestClassMemberSubsetAndRanges(t *testing.T) {
+	for _, member := range []string{"garbage", "size", "+size", "+String owner", "+name: string", "+save()", "+get(id: UUID): Item", "+all() Item[]"} {
+		src := []byte("classDiagram\nclass A {\n" + member + "\n}\n")
+		doc, diags, err := Parse(src, Options{})
+		if err != nil || doc == nil || len(diags) != 0 {
+			t.Fatalf("valid member %q rejected: %v %+v", member, err, diags)
+		}
+	}
+	for _, member := range []string{"+save(", "+save())", "<<interface>>", "style A fill:red", "name ??? invalid"} {
+		src := []byte("classDiagram\nclass A {\n" + member + "\n}\n")
+		doc, diags, err := Parse(src, Options{})
+		if err == nil || doc != nil || len(diags) != 1 || string(src[diags[0].Range.Start:diags[0].Range.End]) != member {
+			t.Fatalf("unsupported member %q not diagnosed at source: %v %+v", member, err, diags)
+		}
+	}
+}

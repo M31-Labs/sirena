@@ -18,6 +18,23 @@ var stateLine = regexp.MustCompile(`^(` + familyIdent + `|\[\*\])\s*-->\s*(` + f
 var classLine = regexp.MustCompile(`^class\s+(` + familyIdent + `)(?:\s*\{\s*)?$`)
 var classEdge = regexp.MustCompile(`^(` + familyIdent + `)(?:\s+"([^"]*)")?\s*(<\|--|--\|>|\*--|--\*|o--|--o|\.\.>|<\.\.|-->|<--|--)\s*(?:"([^"]*)"\s+)?(` + familyIdent + `)(?:\s*:\s*(.*))?$`)
 
+var classFieldMember = regexp.MustCompile(`^[+#~-]?(?:` + familyIdent + `|` + familyIdent + `\s*:\s*[A-Za-z_][A-Za-z0-9_~\[\]?,. ]*|[A-Za-z_][A-Za-z0-9_~\[\]?,.]*\s+` + familyIdent + `)$`)
+var classMethodMember = regexp.MustCompile(`^[+#~-]?` + familyIdent + `\([^(){};]*\)(?:\s*:?\s*[A-Za-z_][A-Za-z0-9_~\[\]?,. ]*)?[$*]?$`)
+
+func supportedClassMember(line string) bool {
+	if len(line) > 2048 {
+		return false
+	}
+	words := strings.Fields(line)
+	if len(words) > 1 {
+		switch words[0] {
+		case "class", "style", "classDef", "cssClass", "click", "note", "direction":
+			return false
+		}
+	}
+	return classFieldMember.MatchString(line) || classMethodMember.MatchString(line)
+}
+
 // These deliberately bounded line grammars preserve supported semantic data.
 // Control blocks, notes and styling are diagnosed instead of silently flattened.
 func parseNativeFamilies(src []byte) (*sirena.Document, []sirena.Diagnostic, error, bool) {
@@ -124,7 +141,7 @@ func parseNativeFamilies(src []byte) (*sirena.Document, []sirena.Diagnostic, err
 					class = ""
 					fields = nil
 					methods = nil
-				} else if strings.ContainsAny(line, "{}") {
+				} else if strings.ContainsAny(line, "{}") || !supportedClassMember(line) || len(fields)+len(methods) >= 256 {
 					break
 				} else if strings.Contains(line, "(") {
 					methods = append(methods, line)

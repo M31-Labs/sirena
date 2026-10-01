@@ -56,7 +56,9 @@ nodes, edges, summaries, and nested boundary frames. Keyframes are capped at 128
 swimlane, timeline, mindmap, bar, pie, gantt, line, scatter, sankey, and radar**. The same declaration identities and relationships
 survive SVG and Scene3D export. Pie and Sankey use SVG; the other families support native 3D. Mermaid import also
 supports flat sequences, states, classes, and indented mindmaps. Control blocks,
-notes and styling in those new families are diagnosed; see [tested compatibility](docs/mermaid-compatibility.md).
+notes and styling in those new families are diagnosed. Class members support bare
+identifiers, optional visibility, name/type fields and balanced method signatures
+with optional return types (up to 256 members per class, 2048 bytes each); see [tested compatibility](docs/mermaid-compatibility.md).
 
 - `state`: rounded states with `state: "initial"` / `state: "final"` markers.
 - `class` / `er`: measured record compartments. Use `fields: "id: UUID; name: string"`
