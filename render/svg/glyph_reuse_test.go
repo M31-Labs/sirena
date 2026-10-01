@@ -56,7 +56,7 @@ func TestGlyphReuseResolvesAndReducesRepeatedText(t *testing.T) {
 			t.Fatalf("unresolved %s", ref)
 		}
 	}
-	if len(refs) < 1000 || len(ids) > 30 {
+	if len(refs) < 100 || len(refs) > 200 || len(ids) > 30 {
 		t.Fatalf("glyphs not reused: %d uses, %d definitions", len(refs), len(ids))
 	}
 	if len(data) > 400000 {

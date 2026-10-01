@@ -19,6 +19,10 @@ Usage:
   sirena lint <workspace-or-file>          Run lint rules
   sirena render [--diagram architecture|sequence|radial] [-o f] [--theme t] <file>
                                          Render a view or system to SVG
+  sirena bench [--runs 7] file.sir|file.mmd
+                                         Measure warm parse/layout/SVG bytes and allocations
+  sirena storyboard --diagram bar --out frames before.sir after.sir
+                                         Export stable SVG states and a frame manifest
   sirena render --help                    Show all render controls and examples
   sirena bake [--theme t] [--infer] <md>...  Bake diagram fences in markdown to SVG
   sirena emit [--format sir|svg] <go-dir>  Emit a Go module's package graph

@@ -9,6 +9,8 @@ type Range struct {
 
 // Document is the root of the IR.
 type Document struct {
+	// Diagram retains a native geometry hint supplied by an ingester.
+	Diagram string `json:",omitempty"`
 	Imports []*Import
 	Systems []*SystemDecl
 	Views   []*ViewDecl

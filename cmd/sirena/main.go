@@ -21,7 +21,7 @@ import (
 	"os"
 )
 
-var version = "v0.5.0"
+var version = "v0.6.0"
 
 func main() {
 	if len(os.Args) < 2 {
@@ -40,6 +40,10 @@ func main() {
 		exit = RunFmt(args, os.Stdout, os.Stderr)
 	case "lint":
 		exit = RunLint(args, os.Stdout, os.Stderr)
+	case "bench":
+		exit = RunBench(args, os.Stdout, os.Stderr)
+	case "storyboard":
+		exit = RunStoryboard(args, os.Stdout, os.Stderr)
 	case "render":
 		exit = RunRender(args, os.Stdout, os.Stderr)
 	case "emit":

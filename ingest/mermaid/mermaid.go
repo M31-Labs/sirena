@@ -45,6 +45,12 @@ type Options struct {
 // Non-flowchart diagram types return a SIR-MERMAID-NOT-A-GRAPH diagnostic
 // and a nil document.
 func Parse(src []byte, opts Options) (*sirena.Document, []sirena.Diagnostic, error) {
+	if doc, diags, err, handled := parseNativeFamilies(src); handled {
+		if opts.Infer && doc != nil {
+			applyInference(doc)
+		}
+		return doc, diags, err
+	}
 	clean, preDiags, smap := normalize(src) // Task A2: graph→flowchart, ;→space, strip styling
 	lang := mermaidLanguage()
 	pool := gt.NewParserPool(lang)

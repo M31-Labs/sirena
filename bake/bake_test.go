@@ -60,8 +60,8 @@ const validMermaidBody = "flowchart LR\n  A[Node A] --> B[Node B]\n"
 const validSirenaBody = "service frontend\nservice backend\nfrontend -> backend: calls\n"
 
 // invalidMermaidBody uses a keyword pattern sirena's mermaid parser treats as
-// NOT-A-GRAPH (sequenceDiagram is unsupported).
-const invalidMermaidBody = "sequenceDiagram\n  A ->> B: hello\n"
+// NOT-A-GRAPH (journey is unsupported).
+const invalidMermaidBody = "journey\n  A ->> B: hello\n"
 
 // mixedMD is a markdown file with one mermaid fence and one sirena fence.
 var mixedMD = "# Architecture\n\n" +

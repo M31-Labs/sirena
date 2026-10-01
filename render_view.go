@@ -12,6 +12,9 @@ func AllElementsView(doc *Document) *ResolvedView {
 	if doc == nil {
 		return rv
 	}
+	if doc.Diagram != "" {
+		rv = WithDiagram(rv, doc.Diagram)
+	}
 	var addBoundary func(b *Boundary)
 	addBoundary = func(b *Boundary) {
 		rv.Boundaries = append(rv.Boundaries, b)

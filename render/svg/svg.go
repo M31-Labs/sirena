@@ -56,8 +56,16 @@ func Render(lr *sirena.LayoutResult, theme *Theme) ([]byte, error) {
 	}
 	writeLifelines(&b, lr.Lifelines)
 	writeBoundaries(&b, lr.BoundaryPlacements)
-	writeEdges(&b, lr.EdgeRoutes, markerPrefix)
-	if lr.Diagram == "bar" || lr.Diagram == "pie" {
+	if lr.Diagram == "sankey" {
+		writeFlows(&b, lr)
+	} else {
+		writeEdges(&b, lr.EdgeRoutes, markerPrefix)
+	}
+	if lr.Plot != nil {
+		writePlot(&b, lr)
+	} else if lr.Radar != nil {
+		writeRadar(&b, lr)
+	} else if lr.Diagram == "bar" || lr.Diagram == "pie" {
 		writeCharts(&b, lr)
 	} else {
 		writeNodes(&b, lr.NodePlacements, lr.Diagram, lr.ChartLabelX)
@@ -237,6 +245,7 @@ func writeSummaries(b *svgBuffer, sps []*sirena.SummaryPlacement) {
 func writeEdges(b *svgBuffer, routes []*sirena.EdgeRoute, marker string) {
 	sorted := append([]*sirena.EdgeRoute(nil), routes...)
 	sort.SliceStable(sorted, func(i, j int) bool { return edgeRouteLess(sorted[i], sorted[j]) })
+	occurrences := map[string]int{}
 	for _, er := range sorted {
 		if len(er.Points) < 2 {
 			continue
@@ -245,7 +254,13 @@ func writeEdges(b *svgBuffer, routes []*sirena.EdgeRoute, marker string) {
 		if er.Edge != nil {
 			kind = "kind-" + er.Edge.Kind.String()
 		}
-		fmt.Fprintf(b, `<g class="edge %s">`, kind)
+		id := "edge"
+		if er.Edge != nil {
+			id = fmt.Sprintf("edge:%s:%s:%d:%d", er.Edge.From, er.Edge.To, er.Edge.Kind, er.Edge.Direction)
+		}
+		occurrence := occurrences[id]
+		occurrences[id]++
+		fmt.Fprintf(b, `<g class="edge %s" data-morph-id="%s:%d">`, kind, html.EscapeString(id), occurrence)
 		b.WriteString(`<path`)
 		if er.Edge != nil {
 			markerID := marker + "-" + edgeMarkerKind(er.Edge)
@@ -309,20 +324,8 @@ func writeLabel(b *svgBuffer, text string, center sirena.Point) {
 	if text == "" {
 		return
 	}
-	scale := labelSize / font.EmSize
-	textW := font.Measure(text) * scale
-	penX := center.X - textW/2
-	baseline := center.Y + labelSize*0.32 // approximate vertical centering
-
-	fmt.Fprintf(b, `<g class="label" role="img" aria-label="%s"><title>%s</title>`, html.EscapeString(text), html.EscapeString(text))
-	for _, r := range text {
-		g := font.Lookup(r)
-		if g.Path != "" {
-			fmt.Fprintf(b, `<use href="#%s" transform="translate(%s %s) scale(%s %s)"/>`,
-				b.glyphID(g.Path), num(penX), num(baseline), num(scale), num(scale))
-		}
-		penX += g.Advance * scale
-	}
+	id := b.labelID(text)
+	fmt.Fprintf(b, `<g class="label" role="img" aria-label="%s"><title>%s</title><use href="#%s" transform="translate(%s %s)"/>`, html.EscapeString(text), html.EscapeString(text), id, num(center.X), num(center.Y))
 	b.WriteString(`</g>`)
 }
 
@@ -398,7 +401,9 @@ func themeScope(theme *Theme) string {
 // Content-derived IDs keep independent diagrams safe when embedded together.
 type svgBuffer struct {
 	bytes.Buffer
-	glyphs map[string]string
+	glyphs      map[string]string
+	labels      map[string]string
+	labelBodies map[string]string
 }
 
 func (b *svgBuffer) glyphID(path string) string {
@@ -413,6 +418,33 @@ func (b *svgBuffer) glyphID(path string) string {
 	b.glyphs[path] = id
 	return id
 }
+
+// Repeated labels share their positioned glyph run as well as their outlines.
+// Definitions are centered at the origin, keeping instance transforms compact.
+func (b *svgBuffer) labelID(text string) string {
+	if b.labels == nil {
+		b.labels = map[string]string{}
+		b.labelBodies = map[string]string{}
+	}
+	if id, ok := b.labels[text]; ok {
+		return id
+	}
+	sum := sha256.Sum256([]byte(text))
+	id := fmt.Sprintf("sirena-label-%x", sum[:12])
+	b.labels[text] = id
+	scale := labelSize / font.EmSize
+	penX := -font.Measure(text) * scale / 2
+	var run strings.Builder
+	for _, r := range text {
+		g := font.Lookup(r)
+		if g.Path != "" {
+			fmt.Fprintf(&run, `<use href="#%s" transform="translate(%s %s) scale(%s %s)"/>`, b.glyphID(g.Path), num(penX), num(labelSize*.32), num(scale), num(scale))
+		}
+		penX += g.Advance * scale
+	}
+	b.labelBodies[text] = run.String()
+	return id
+}
 func (b *svgBuffer) writeGlyphs() {
 	paths := make([]string, 0, len(b.glyphs))
 	for path := range b.glyphs {
@@ -422,6 +454,14 @@ func (b *svgBuffer) writeGlyphs() {
 	b.WriteString("<defs>")
 	for _, path := range paths {
 		fmt.Fprintf(&b.Buffer, `<path id="%s" d="%s"/>`, b.glyphs[path], path)
+	}
+	texts := make([]string, 0, len(b.labels))
+	for text := range b.labels {
+		texts = append(texts, text)
+	}
+	sort.Strings(texts)
+	for _, text := range texts {
+		fmt.Fprintf(&b.Buffer, `<g id="%s">%s</g>`, b.labels[text], b.labelBodies[text])
 	}
 	b.WriteString("</defs>\n")
 }

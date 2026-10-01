@@ -37,7 +37,7 @@ type RenderOptions struct {
 	// report so callers can warn, but does not abort.
 	StrictBudget bool
 	// Diagram selects architecture (default), sequence, radial, state, class,
-	// er, swimlane, timeline, mindmap, bar, pie, or gantt geometry.
+	// er, swimlane, timeline, mindmap, bar, pie, gantt, line, scatter, sankey, or radar geometry.
 	// Empty preserves the view's layout { diagram: ... } hint.
 	Diagram string
 }
@@ -47,6 +47,9 @@ type RenderOptions struct {
 // and edge. The geometric value types live in geometry.go; the layout
 // algorithms that fill these slices live in m31labs.dev/sirena/layout.
 type LayoutResult struct {
+	Plot                       *PlotPlacement
+	Radar                      *RadarPlacement
+	Flows                      []FlowPlacement
 	PieSlices                  []PieSlicePlacement
 	ChartBaseline, ChartLabelX float64
 	ChartStart, ChartEnd       string
@@ -118,7 +121,7 @@ var ErrBudgetExceeded = errors.New("sirena: view budget exceeded; see BudgetRepo
 func Render(rv *ResolvedView, opts RenderOptions) (*LayoutResult, *BudgetReport, error) {
 	if opts.Diagram != "" {
 		if !ValidDiagram(opts.Diagram) {
-			return nil, nil, errors.New("sirena: diagram must be architecture, sequence, radial, state, class, er, swimlane, timeline, mindmap, bar, pie, or gantt")
+			return nil, nil, errors.New("sirena: diagram must be architecture, sequence, radial, state, class, er, swimlane, timeline, mindmap, bar, pie, gantt, line, scatter, sankey, or radar")
 		}
 		rv = WithDiagram(rv, opts.Diagram)
 	}

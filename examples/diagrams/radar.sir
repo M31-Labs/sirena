@@ -1,0 +1,4 @@
+service speed { axis: "Speed" value: 8 }
+service breadth { axis: "Breadth" value: 6 }
+service clarity { axis: "Clarity" value: 9 }
+service portability { axis: "Portability" value: 7 }
