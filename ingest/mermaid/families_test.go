@@ -55,3 +55,34 @@ func TestClassMemberSubsetAndRanges(t *testing.T) {
 		}
 	}
 }
+
+func TestGeneratedFamilyIdentitiesCannotCollideWithAuthoredNames(t *testing.T) {
+	for _, source := range []string{
+		"stateDiagram-v2\n[*] --> __initial\n__initial --> __final\n__final --> [*]\n",
+		"mindmap\n__mindmap_2((Root))\n  Plain branch\n",
+	} {
+		doc, diags, err := Parse([]byte(source), Options{})
+		if err != nil || len(diags) != 0 {
+			t.Fatal(err, diags)
+		}
+		rv := sirena.AllElementsView(doc)
+		if doc.Diagram == "state" {
+			if len(rv.Elements) != 4 || len(rv.Edges) != 3 {
+				t.Fatal("pseudo-state merged with authored state")
+			}
+			if rv.Edges[0].From == rv.Edges[0].To || rv.Edges[2].From == rv.Edges[2].To {
+				t.Fatal("distinct transition became self-edge")
+			}
+		} else if len(rv.Elements) != 2 {
+			t.Fatal("anonymous branch collided with authored root")
+		}
+		for _, element := range rv.Elements {
+			if strings.HasPrefix(element.Name, "__sirena_") && familyName.MatchString(element.Name) {
+				t.Fatal("generated identity belongs to authored namespace")
+			}
+		}
+		if _, _, err := layout.Render(rv, sirena.RenderOptions{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+}

@@ -119,11 +119,11 @@ func parseNativeFamilies(src []byte) (*sirena.Document, []sirena.Diagnostic, err
 			} else if m := stateLine.FindStringSubmatch(line); m != nil {
 				from, to := m[1], m[2]
 				if from == "[*]" {
-					from = "__initial"
+					from = "__sirena_state:initial"
 					add(from, "").Metadata["state"] = sirena.String{Value: "initial"}
 				}
 				if to == "[*]" {
-					to = "__final"
+					to = "__sirena_state:final"
 					add(to, "").Metadata["state"] = sirena.String{Value: "final"}
 				}
 				edge(from, to, m[3])
@@ -168,7 +168,7 @@ func parseNativeFamilies(src []byte) (*sirena.Document, []sirena.Diagnostic, err
 			}
 		case "mindmap":
 			indent := len(raw) - len(strings.TrimLeft(raw, " \t"))
-			name := fmt.Sprintf("__mindmap_%d", i)
+			name := fmt.Sprintf("__sirena_mindmap:%d", i)
 			label := line
 			if cut := strings.IndexAny(line, "(["); cut > 0 {
 				candidate := strings.TrimSpace(line[:cut])
