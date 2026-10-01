@@ -93,11 +93,20 @@ func Build(lr *sirena.LayoutResult, opts Options) ([]byte, error) {
 		}
 		custom = material
 	}
-	// Fixed world scale, with aspect ratio preserved and centered at the origin.
+	// Center the server layout at the origin. Very wide records need a separate
+	// vertical scale: a capped label must not collapse all measured rows into
+	// a few pixels because the original untruncated text measured very wide.
 	scale := 12 / math.Max(lr.Bounds.Width(), lr.Bounds.Height()*1.7)
+	scaleY := scale
+	if (lr.Diagram == "class" || lr.Diagram == "er") && lr.Bounds.Width() > lr.Bounds.Height()*6 {
+		scaleY = 6 / lr.Bounds.Height()
+	}
 	center := lr.Bounds.Center()
-	point := func(p sirena.Point) scene.Vector3 { return scene.Vec3((p.X-center.X)*scale, (center.Y-p.Y)*scale, 0) }
+	point := func(p sirena.Point) scene.Vector3 { return scene.Vec3((p.X-center.X)*scale, (center.Y-p.Y)*scaleY, 0) }
 	var nodes []scene.Node
+	// Record decorations share their owner's presentation lifetime.
+	attachments := map[string][]string{}
+	accessible := "Sirena diagram"
 	emit := func(items ...scene.Node) error {
 		if len(nodes)+len(items) > maxSceneItems {
 			return fmt.Errorf("sirena scene3d: select a view with at most %d scene objects and labels", maxSceneItems)
@@ -132,7 +141,7 @@ func Build(lr *sirena.LayoutResult, opts Options) ([]byte, error) {
 		if err := add(id); err != nil {
 			return nil, err
 		}
-		width, height := placement.Bounds.Width()*scale, placement.Bounds.Height()*scale
+		width, height := placement.Bounds.Width()*scale, placement.Bounds.Height()*scaleY
 		geometry := scene.Geometry(scene.BoxGeometry{Width: width, Height: height, Depth: .35})
 		color := "#88cab9"
 		switch n.Kind {
@@ -145,7 +154,7 @@ func Build(lr *sirena.LayoutResult, opts Options) ([]byte, error) {
 		case sirena.ElementKindQueue:
 			color = "#edc183"
 		}
-		if lr.Diagram == "bar" || lr.Diagram == "gantt" || lr.Diagram == "timeline" {
+		if lr.Diagram == "bar" || lr.Diagram == "gantt" || lr.Diagram == "timeline" || lr.Diagram == "class" || lr.Diagram == "er" {
 			geometry = scene.BoxGeometry{Width: width, Height: height, Depth: .35}
 		}
 		if lr.Plot != nil || lr.Radar != nil {
@@ -197,6 +206,31 @@ func Build(lr *sirena.LayoutResult, opts Options) ([]byte, error) {
 			start, _ := n.Metadata["start"].(sirena.String)
 			end, _ := n.Metadata["end"].(sirena.String)
 			text += " · " + start.Value + " → " + end.Value
+		}
+		if lr.Diagram == "class" || lr.Diagram == "er" {
+			if err := emit(mesh); err != nil {
+				return nil, err
+			}
+			for _, item := range recordNodes(placement, mesh, scale, scaleY) {
+				var childID string
+				switch child := item.(type) {
+				case scene.Label:
+					childID = child.ID
+					accessible += "; " + child.Text
+					child.Text = recordLabelText(child.Text, 14)
+					item = child
+				case scene.Mesh:
+					childID = child.ID
+				}
+				if err := add(childID); err != nil {
+					return nil, err
+				}
+				attachments[id] = append(attachments[id], childID)
+				if err := emit(item); err != nil {
+					return nil, err
+				}
+			}
+			continue
 		}
 		label := nodeLabel(id, text, height)
 		// GoSX resolves target anchors when lowering the scene. Mirror native drift
@@ -374,6 +408,14 @@ func Build(lr *sirena.LayoutResult, opts Options) ([]byte, error) {
 			return nil, err
 		}
 		if route.Label != nil && route.Label.Text != "" {
+			text := route.Label.Text
+			collision := "avoid"
+			anchor := route.Label.Anchor
+			if lr.Diagram == "class" || lr.Diagram == "er" {
+				accessible += "; " + route.Label.Text
+				text = recordLabelText(text, 12)
+				collision = "allow"
+			}
 			offsetY := -14.0
 			first, last := route.Points[0], route.Points[len(route.Points)-1]
 			if lr.Diagram == "sequence" {
@@ -382,12 +424,17 @@ func Build(lr *sirena.LayoutResult, opts Options) ([]byte, error) {
 				// Horizontal relationships pass below the elevated node labels.
 				offsetY = 14
 			}
-			if err := emit(scene.Label{ID: "label:" + id, Text: route.Label.Text, Position: point(route.Label.Anchor), Color: "#bacdd2", Font: "12px sans-serif", Background: "#101923", AnchorX: .5, AnchorY: .5, OffsetY: offsetY, LineHeight: 16, WhiteSpace: "pre", MaxWidth: 320, MaxLines: 1}); err != nil {
+			if scaleY != scale && math.Abs(last.X-first.X) > math.Abs(last.Y-first.Y) {
+				// Extremely wide source records squeeze the gutter when fitted.
+				// Put their caption above the cards so it cannot cover record rows.
+				anchor.Y, offsetY = lr.Bounds.Min.Y-8, 0
+			}
+			if err := emit(scene.Label{ID: "label:" + id, Text: text, Position: point(anchor), Color: "#bacdd2", Font: "12px sans-serif", Background: "#101923", AnchorX: .5, AnchorY: .5, OffsetY: offsetY, LineHeight: 16, WhiteSpace: "pre", MaxWidth: 320, MaxLines: 1, Overflow: "ellipsis", Collision: collision}); err != nil {
 				return nil, err
 			}
 		}
 	}
-	props := scene.Props{AriaLabel: "Sirena diagram", Background: "transparent", CanvasAlpha: scene.Bool(true), Responsive: scene.Bool(true), FillHeight: scene.Bool(true), DragToRotate: scene.Bool(lr.Diagram != "sequence"), MaxFrameRate: 30, MaxDevicePixelRatio: 1.5, MaxPixels: 2_000_000, AdaptiveQuality: scene.Bool(true), Camera: scene.PerspectiveCamera{Position: scene.Vec3(0, 0, 11), FOV: 50, Near: .1, Far: 100}, Environment: scene.Environment{AmbientIntensity: .85}, Graph: scene.NewGraph(nodes...)}
+	props := scene.Props{AriaLabel: accessible, Background: "transparent", CanvasAlpha: scene.Bool(true), Responsive: scene.Bool(true), FillHeight: scene.Bool(true), DragToRotate: scene.Bool(lr.Diagram != "sequence"), MaxFrameRate: 30, MaxDevicePixelRatio: 1.5, MaxPixels: 2_000_000, AdaptiveQuality: scene.Bool(true), Camera: scene.PerspectiveCamera{Position: scene.Vec3(0, 0, 11), FOV: 50, Near: .1, Far: 100}, Environment: scene.Environment{AmbientIntensity: .85}, Graph: scene.NewGraph(nodes...)}
 	var payload map[string]any
 	if err := json.Unmarshal(props.EngineConfig().Props, &payload); err != nil {
 		return nil, err
@@ -397,7 +444,7 @@ func Build(lr *sirena.LayoutResult, opts Options) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		timeline, err := buildTimeline(props.SceneIR(), steps)
+		timeline, err := buildTimeline(props.SceneIR(), steps, attachments)
 		if err != nil {
 			return nil, err
 		}
@@ -408,7 +455,7 @@ func Build(lr *sirena.LayoutResult, opts Options) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		timeline, err := buildTimeline(props.SceneIR(), steps)
+		timeline, err := buildTimeline(props.SceneIR(), steps, attachments)
 		if err != nil {
 			return nil, err
 		}
@@ -444,7 +491,7 @@ func nodeLabel(id, text string, height float64) scene.Label {
 	}
 }
 
-func buildTimeline(ir scene.SceneIR, steps []Step) (Timeline, error) {
+func buildTimeline(ir scene.SceneIR, steps []Step, attachments map[string][]string) (Timeline, error) {
 	if len(steps) > 128 {
 		return Timeline{}, fmt.Errorf("sirena scene3d: at most 128 keyframes")
 	}
@@ -495,11 +542,19 @@ func buildTimeline(ir scene.SceneIR, steps []Step) (Timeline, error) {
 		for _, id := range ids {
 			obj := objects[id]
 			patch := patches[id]
+			children := attachments[id]
+			if len(children) == 0 {
+				children = []string{"label:" + id}
+			}
 			if replacements[id] {
 				frame.Commands = append(frame.Commands, scene.Command{Kind: scene.CommandRemoveObject, ObjectID: id})
 				if patch.Visible != nil && !*patch.Visible {
-					if label, ok := labels["label:"+id]; ok {
-						frame.Commands = append(frame.Commands, scene.Command{Kind: scene.CommandRemoveObject, ObjectID: label.ID})
+					for _, childID := range children {
+						if _, ok := labels[childID]; ok {
+							frame.Commands = append(frame.Commands, scene.Command{Kind: scene.CommandRemoveObject, ObjectID: childID})
+						} else if _, ok := objects[childID]; ok {
+							frame.Commands = append(frame.Commands, scene.Command{Kind: scene.CommandRemoveObject, ObjectID: childID})
+						}
 					}
 					continue
 				}
@@ -536,11 +591,23 @@ func buildTimeline(ir scene.SceneIR, steps []Step) (Timeline, error) {
 			frame.Commands = append(frame.Commands, scene.Command{Kind: scene.CommandSetTransform, ObjectID: id, Data: map[string]any{"x": x, "y": y, "z": z, "rotationX": obj.RotationX, "rotationY": obj.RotationY, "rotationZ": obj.RotationZ, "scaleX": sx, "scaleY": sy, "scaleZ": sz}})
 			// Labels are separate projected objects. Every visible frame recreates
 			// the original label, including a reveal after a hidden frame.
-			if label, ok := labels["label:"+id]; ok {
-				label.X += x - obj.X
-				label.Y += y - obj.Y
-				label.Z += z - obj.Z
-				frame.Commands = append(frame.Commands, scene.Command{Kind: scene.CommandRemoveObject, ObjectID: label.ID}, scene.CreateLabelCommand(label))
+			factor := 1.0
+			if patch.Scale != nil && len(attachments[id]) > 0 {
+				factor = *patch.Scale
+			}
+			for _, childID := range children {
+				if label, ok := labels[childID]; ok {
+					label.X = x + (label.X-obj.X)*factor
+					label.Y = y + (label.Y-obj.Y)*factor
+					label.Z = z + (label.Z-obj.Z)*factor
+					frame.Commands = append(frame.Commands, scene.Command{Kind: scene.CommandRemoveObject, ObjectID: label.ID}, scene.CreateLabelCommand(label))
+				} else if child, ok := objects[childID]; ok {
+					child.X = x + (child.X-obj.X)*factor
+					child.Y = y + (child.Y-obj.Y)*factor
+					child.Z = z + (child.Z-obj.Z)*factor
+					child.ScaleX, child.ScaleY, child.ScaleZ = sx, sy, sz
+					frame.Commands = append(frame.Commands, scene.Command{Kind: scene.CommandRemoveObject, ObjectID: childID}, scene.CreateObjectCommand(child))
+				}
 			}
 		}
 		timeline.Frames = append(timeline.Frames, frame)

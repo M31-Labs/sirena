@@ -1,0 +1,334 @@
+{
+  "adaptiveQuality": true,
+  "ariaLabel": "Sirena diagram; Customer; PK id: UUID; email: string; Order; PK id: UUID; FK customer_id: UUID; total: decimal; 1 to many",
+  "background": "transparent",
+  "camera": {
+    "far": 100,
+    "fov": 50,
+    "near": 0.1,
+    "z": 11
+  },
+  "canvasAlpha": true,
+  "dragToRotate": true,
+  "fillHeight": true,
+  "maxDevicePixelRatio": 1.5,
+  "maxFrameRate": 30,
+  "maxPixels": 2000000,
+  "responsive": true,
+  "scene": {
+    "backendCaps": {
+      "capable": [
+        "webgpu",
+        "webgl",
+        "canvas2d"
+      ]
+    },
+    "environment": {
+      "ambientIntensity": 0.85
+    },
+    "labels": [
+      {
+        "anchorX": 0.5,
+        "anchorY": 0.5,
+        "background": "transparent",
+        "borderColor": "transparent",
+        "collision": "allow",
+        "color": "#102b32",
+        "font": "600 14px sans-serif",
+        "id": "label:customer",
+        "lineHeight": 16,
+        "maxLines": 1,
+        "maxWidth": 320,
+        "overflow": "ellipsis",
+        "priority": 100,
+        "text": "Customer",
+        "whiteSpace": "pre",
+        "x": -3.6338399665726526,
+        "y": 0.9627076151676591,
+        "z": 0.2
+      },
+      {
+        "anchorX": 1e-9,
+        "anchorY": 0.5,
+        "background": "transparent",
+        "borderColor": "transparent",
+        "collision": "allow",
+        "color": "#102b32",
+        "font": "14px sans-serif",
+        "id": "label:customer:fields:0",
+        "lineHeight": 16,
+        "maxLines": 1,
+        "maxWidth": 320,
+        "offsetX": -10,
+        "overflow": "ellipsis",
+        "priority": 100,
+        "text": "PK id: UUID",
+        "whiteSpace": "pre",
+        "x": -5.67909746161078,
+        "y": 0.32090253838921967,
+        "z": 0.2
+      },
+      {
+        "anchorX": 1e-9,
+        "anchorY": 0.5,
+        "background": "transparent",
+        "borderColor": "transparent",
+        "collision": "allow",
+        "color": "#102b32",
+        "font": "14px sans-serif",
+        "id": "label:customer:fields:1",
+        "lineHeight": 16,
+        "maxLines": 1,
+        "maxWidth": 320,
+        "offsetX": -10,
+        "overflow": "ellipsis",
+        "priority": 100,
+        "text": "email: string",
+        "whiteSpace": "pre",
+        "x": -5.67909746161078,
+        "y": -0.32090253838921967,
+        "z": 0.2
+      },
+      {
+        "anchorX": 0.5,
+        "anchorY": 0.5,
+        "background": "transparent",
+        "borderColor": "transparent",
+        "collision": "allow",
+        "color": "#102b32",
+        "font": "600 14px sans-serif",
+        "id": "label:order",
+        "lineHeight": 16,
+        "maxLines": 1,
+        "maxWidth": 320,
+        "overflow": "ellipsis",
+        "priority": 100,
+        "text": "Order",
+        "whiteSpace": "pre",
+        "x": 3.6338399665726526,
+        "y": 0.9627076151676591,
+        "z": 0.2
+      },
+      {
+        "anchorX": 1e-9,
+        "anchorY": 0.5,
+        "background": "transparent",
+        "borderColor": "transparent",
+        "collision": "allow",
+        "color": "#102b32",
+        "font": "14px sans-serif",
+        "id": "label:order:fields:0",
+        "lineHeight": 16,
+        "maxLines": 1,
+        "maxWidth": 320,
+        "offsetX": -10,
+        "overflow": "ellipsis",
+        "priority": 100,
+        "text": "PK id: UUID",
+        "whiteSpace": "pre",
+        "x": 1.5885824715345245,
+        "y": 0.32090253838921967,
+        "z": 0.2
+      },
+      {
+        "anchorX": 1e-9,
+        "anchorY": 0.5,
+        "background": "transparent",
+        "borderColor": "transparent",
+        "collision": "allow",
+        "color": "#102b32",
+        "font": "14px sans-serif",
+        "id": "label:order:fields:1",
+        "lineHeight": 16,
+        "maxLines": 1,
+        "maxWidth": 320,
+        "offsetX": -10,
+        "overflow": "ellipsis",
+        "priority": 100,
+        "text": "FK customer_id: UUID",
+        "whiteSpace": "pre",
+        "x": 1.5885824715345245,
+        "y": -0.32090253838921967,
+        "z": 0.2
+      },
+      {
+        "anchorX": 1e-9,
+        "anchorY": 0.5,
+        "background": "transparent",
+        "borderColor": "transparent",
+        "collision": "allow",
+        "color": "#102b32",
+        "font": "14px sans-serif",
+        "id": "label:order:fields:2",
+        "lineHeight": 16,
+        "maxLines": 1,
+        "maxWidth": 320,
+        "offsetX": -10,
+        "overflow": "ellipsis",
+        "priority": 100,
+        "text": "total: decimal",
+        "whiteSpace": "pre",
+        "x": 1.5885824715345245,
+        "y": -0.9627076151676591,
+        "z": 0.2
+      },
+      {
+        "anchorX": 0.5,
+        "anchorY": 0.5,
+        "background": "#101923",
+        "collision": "allow",
+        "color": "#bacdd2",
+        "font": "12px sans-serif",
+        "id": "label:edge:0",
+        "lineHeight": 16,
+        "maxLines": 1,
+        "maxWidth": 320,
+        "offsetY": 14,
+        "overflow": "ellipsis",
+        "text": "1 to many",
+        "whiteSpace": "pre",
+        "y": 0.21393502559281313
+      }
+    ],
+    "objects": [
+      {
+        "color": "#b9a5f7",
+        "depth": 0.35,
+        "height": 2.9950903582993837,
+        "id": "customer",
+        "kind": "box",
+        "materialKind": "standard",
+        "metalness": 0.15,
+        "roughness": 0.35,
+        "width": 4.732320066854696,
+        "wireframe": false,
+        "x": -3.6338399665726526
+      },
+      {
+        "color": "#3e5362",
+        "emissive": 1,
+        "id": "record:customer:dividers",
+        "kind": "lines",
+        "lineSegments": [
+          [
+            0,
+            1
+          ]
+        ],
+        "lineWidth": 1,
+        "materialKind": "standard",
+        "points": [
+          {
+            "x": -2.366160033427348,
+            "y": 0.6418050767784393,
+            "z": 0.18
+          },
+          {
+            "x": 2.366160033427348,
+            "y": 0.6418050767784393,
+            "z": 0.18
+          }
+        ],
+        "wireframe": false,
+        "x": -3.6338399665726526
+      },
+      {
+        "color": "#b9a5f7",
+        "depth": 0.35,
+        "height": 2.9950903582993837,
+        "id": "order",
+        "kind": "box",
+        "materialKind": "standard",
+        "metalness": 0.15,
+        "roughness": 0.35,
+        "width": 4.732320066854696,
+        "wireframe": false,
+        "x": 3.6338399665726526
+      },
+      {
+        "color": "#3e5362",
+        "emissive": 1,
+        "id": "record:order:dividers",
+        "kind": "lines",
+        "lineSegments": [
+          [
+            0,
+            1
+          ]
+        ],
+        "lineWidth": 1,
+        "materialKind": "standard",
+        "points": [
+          {
+            "x": -2.366160033427348,
+            "y": 0.6418050767784393,
+            "z": 0.18
+          },
+          {
+            "x": 2.366160033427348,
+            "y": 0.6418050767784393,
+            "z": 0.18
+          }
+        ],
+        "wireframe": false,
+        "x": 3.6338399665726526
+      },
+      {
+        "color": "#658d98",
+        "emissive": 1,
+        "id": "edge:0",
+        "kind": "lines",
+        "lineSegments": [
+          [
+            0,
+            1
+          ],
+          [
+            2,
+            3
+          ],
+          [
+            4,
+            5
+          ]
+        ],
+        "lineWidth": 2,
+        "materialKind": "standard",
+        "points": [
+          {
+            "x": -1.2676799331453046,
+            "y": 0,
+            "z": -0.25
+          },
+          {
+            "x": 1.2676799331453046,
+            "y": 0,
+            "z": -0.25
+          },
+          {
+            "x": 1.2676799331453046,
+            "y": 0,
+            "z": -0.25
+          },
+          {
+            "x": 1.0876799331453046,
+            "y": -0.09,
+            "z": -0.25
+          },
+          {
+            "x": 1.2676799331453046,
+            "y": 0,
+            "z": -0.25
+          },
+          {
+            "x": 1.0876799331453046,
+            "y": 0.09,
+            "z": -0.25
+          }
+        ],
+        "wireframe": false
+      }
+    ],
+    "shadowMaxPixels": 1048576
+  }
+}
