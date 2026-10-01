@@ -6,7 +6,68 @@ import (
 	"testing"
 
 	"m31labs.dev/gosx/scene"
+	"m31labs.dev/sirena"
 )
+
+func TestChoreographyPatchResolvesDeclarationAndStableID(t *testing.T) {
+	lr := diagram(t)
+	for _, placement := range lr.NodePlacements {
+		if placement.Node.Name == "api" {
+			placement.Node.Metadata["sid"] = sirena.String{Value: "stable-api"}
+		}
+	}
+	x := 1.5
+	var byName []byte
+	for _, target := range []string{"api", "stable-api"} {
+		data, err := Build(lr, Options{Steps: []Step{
+			{Label: "Overview"},
+			{Label: "API", Focus: []string{"api"}, Patches: []Patch{{Target: target, X: &x}}},
+		}})
+		if err != nil {
+			t.Fatalf("patch target %q: %v", target, err)
+		}
+		if target == "api" {
+			byName = data
+		} else if !reflect.DeepEqual(data, byName) {
+			t.Fatal("declaration name and stable ID produce different absolute poses")
+		}
+		var payload struct {
+			SlideSteps Timeline `json:"slideSteps"`
+		}
+		if err := json.Unmarshal(data, &payload); err != nil {
+			t.Fatal(err)
+		}
+		found := false
+		for _, command := range payload.SlideSteps.Frames[1].Commands {
+			if command.Kind == scene.CommandSetTransform && command.ObjectID == "stable-api" {
+				pose := command.Data.(map[string]any)
+				if pose["x"] != x || pose["z"] != .4 {
+					t.Fatalf("explicit patch and focus were not combined: %v", pose)
+				}
+				found = true
+			}
+		}
+		if !found {
+			t.Fatal("missing stable API transform")
+		}
+	}
+	if _, err := Build(lr, Options{Steps: []Step{{Patches: []Patch{
+		{Target: "api", X: &x}, {Target: "stable-api", X: &x},
+	}}}}); err == nil {
+		t.Fatal("two aliases for the same patch target must be rejected")
+	}
+}
+
+func TestChoreographyPatchPreservesNativeObjectIDs(t *testing.T) {
+	lr := diagram(t)
+	lr.BoundaryPlacements = []*sirena.BoundaryPlacement{{
+		Boundary: &sirena.Boundary{Name: "system"}, Bounds: lr.Bounds,
+	}}
+	z := .5
+	if _, err := Build(lr, Options{Steps: []Step{{Patches: []Patch{{Target: "boundary:system", Z: &z}}}}}); err != nil {
+		t.Fatalf("native boundary patch: %v", err)
+	}
+}
 
 func TestChoreographyAbsoluteRevealTraceAndFocus(t *testing.T) {
 	lr := diagram(t)
