@@ -1,0 +1,7 @@
+service design { label: "Design" start: "2026-10-01" end: "2026-10-04" }
+service build { label: "Build" start: "2026-10-03" end: "2026-10-10" }
+service validate { label: "Validation" start: "2026-10-10" end: "2026-10-13" }
+service ship { label: "Ship" start: "2026-10-13" end: "2026-10-14" }
+design -> build: depends_on "handoff"
+build -> validate: depends_on "ready"
+validate -> ship: depends_on "approved"

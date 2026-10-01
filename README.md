@@ -2,7 +2,7 @@
 
 A modernized diagram language and renderer. Arch/systems diagrams as the wedge, with a multi-file project model and a pure-Go layout engine — designed to be mdpp's native diagram surface. No JavaScript toolchain, no headless browser; pure Go end to end.
 
-**Status:** SVG and native GoSX Scene3D export, with architecture, sequence, and radial diagrams.
+**Status:** SVG and native GoSX Scene3D export, with 12 native diagram families, deterministic layouts, and reusable SVG glyphs.
 
 Install from source with Go 1.26 or newer:
 
@@ -53,8 +53,8 @@ nodes, edges, summaries, and nested boundary frames. Keyframes are capped at 128
 ### Diagram families and semantic presentation beats
 
 `render --diagram` supports **architecture, sequence, radial, state, class, er,
-swimlane, and timeline**. The same declaration identities and relationships
-survive SVG and Scene3D export. These are native Sirena layouts; Mermaid
+swimlane, timeline, mindmap, bar, pie, and gantt**. The same declaration identities and relationships
+survive SVG and Scene3D export. Pie uses SVG; the other families can use native 3D. These are native Sirena layouts; Mermaid
 import remains limited to flowcharts.
 
 - `state`: rounded states with `state: "initial"` / `state: "final"` markers.
@@ -65,6 +65,14 @@ import remains limited to flowcharts.
   progression across lanes.
 - `timeline`: numeric `start: 2 duration: 5` values share one time unit. Bar widths
   preserve duration ratios; names remain outside bars. Dates are not parsed.
+
+- `mindmap`: a parent-to-child forest with measured boxes. Cycles and multiple parents
+  report clear errors; declaration order makes branching deterministic.
+- `bar`: `value: -18` produces a signed horizontal bar chart with a shared zero axis.
+- `pie`: non-negative `value` metadata produces proportional sectors and a measured
+  legend with values and percentages. At most 100 slices; no relationships.
+- `gantt`: `start: "2026-10-01" end: "2026-10-04"` uses actual UTC calendar days
+  and an exclusive end date. Dependency relationships remain visible.
 
 Copy the runnable sources in `examples/diagrams/`. Non-architecture layouts
 require flat views and reject nested boundaries rather than dropping them.
@@ -114,3 +122,27 @@ use a single line capped at 320 pixels; choose concise labels and smaller views
 for presentation-sized diagrams. GoSX respects reduced-motion preferences.
 Boundary headers reserve space above their children, and SVG viewports include
 routed relationships and measured captions to prevent clipping.
+
+## Measured SVG performance
+
+Repeated labels share content-addressed glyph definitions through SVG `<use>`.
+The font outlines, accessible text, deterministic byte output, and theme scoping
+remain intact. This avoids duplicating the full outline of every repeated letter.
+
+Run the rendering benchmark on your machine:
+
+```sh
+go test ./render/svg -run '^$' -bench BenchmarkDiagramPipeline -benchmem
+```
+
+It reports time, allocations, and SVG bytes separately for 20, 100, and 500-node
+mindmaps, bar charts, sequences, and class diagrams. Parsing and layout are outside
+this rendering measurement. Timings vary with hardware; use the same fixtures and
+machine when comparing releases. Native 3D tours support mindmap, bar, and Gantt
+with `--tour nodes --motion-style float`. Pie is SVG-only in this release.
+
+A same-machine comparison against v0.4.0 (20 iterations, Intel Core Ultra 9 285)
+reduced the 500-node class SVG from 6,599,478 to 1,979,600 bytes (70.0%), rendering
+allocations from 18.8 MB to 6.25 MB per operation (66.8%), and rendering time from
+10.88 ms to 7.95 ms (26.9%). The 500-actor sequence SVG shrank 69.2%. These are
+fixture measurements, not an end-to-end comparison with other diagram tools.

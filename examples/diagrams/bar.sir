@@ -1,0 +1,3 @@
+service baseline { label: "Previous release" value: 35 }
+service improvement { label: "New release" value: 72 }
+service regression { label: "Removed overhead" value: -18 }

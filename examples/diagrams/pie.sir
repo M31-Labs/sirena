@@ -1,0 +1,3 @@
+service authored { label: "Authoring" value: 45 }
+service presenting { label: "Presenting" value: 35 }
+service sharing { label: "Sharing" value: 20 }

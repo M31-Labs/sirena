@@ -58,6 +58,9 @@ type Timeline struct {
 // It leaves the layout and IR untouched. Scene labels retain readable node and
 // relationship text; arrowheads preserve reverse and bidirectional relations.
 func Build(lr *sirena.LayoutResult, opts Options) ([]byte, error) {
+	if lr != nil && lr.Diagram == "pie" {
+		return nil, fmt.Errorf("sirena scene3d: pie currently requires SVG export; use bar for native 3D data")
+	}
 	if opts.MotionStyle != "" && opts.MotionStyle != "spin" && opts.MotionStyle != "float" {
 		return nil, fmt.Errorf("sirena scene3d: motion style must be spin or float")
 	}
@@ -142,6 +145,9 @@ func Build(lr *sirena.LayoutResult, opts Options) ([]byte, error) {
 		case sirena.ElementKindQueue:
 			color = "#edc183"
 		}
+		if lr.Diagram == "bar" || lr.Diagram == "gantt" || lr.Diagram == "timeline" {
+			geometry = scene.BoxGeometry{Width: width, Height: height, Depth: .35}
+		}
 		material := scene.Material(scene.StandardMaterial{Color: color, Roughness: .35, Metalness: .15})
 		if custom != nil && (len(selected) == 0 || selected[id]) {
 			material = custom
@@ -173,7 +179,18 @@ func Build(lr *sirena.LayoutResult, opts Options) ([]byte, error) {
 			}
 		}
 
-		label := nodeLabel(id, elementLabel(n), height)
+		text := elementLabel(n)
+		if lr.Diagram == "bar" {
+			if value, ok := n.Metadata["value"].(sirena.Number); ok {
+				text = fmt.Sprintf("%s: %g", text, value.Value)
+			}
+		}
+		if lr.Diagram == "gantt" {
+			start, _ := n.Metadata["start"].(sirena.String)
+			end, _ := n.Metadata["end"].(sirena.String)
+			text += " · " + start.Value + " → " + end.Value
+		}
+		label := nodeLabel(id, text, height)
 		// GoSX resolves target anchors when lowering the scene. Mirror native drift
 		// so the label keeps following its mesh during browser animation.
 		label.Shift, label.DriftSpeed, label.DriftPhase = mesh.Drift, mesh.DriftSpeed, mesh.DriftPhase
