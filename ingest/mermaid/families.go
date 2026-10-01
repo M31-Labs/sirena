@@ -10,6 +10,8 @@ import (
 
 const familyIdent = `[A-Za-z_][A-Za-z0-9_]*`
 
+var generatedFamilyName = regexp.MustCompile(`__sirena_[A-Za-z0-9_]*`)
+
 var familyName = regexp.MustCompile(`^` + familyIdent + `$`)
 var participantLine = regexp.MustCompile(`^(?:participant|actor)\s+(` + familyIdent + `)(?:\s+as\s+(.+))?$`)
 var messageLine = regexp.MustCompile(`^(` + familyIdent + `)\s*(--?>>|--?>|--?x|--?\))\s*(` + familyIdent + `)\s*:\s*(.*)$`)
@@ -20,6 +22,7 @@ var classEdge = regexp.MustCompile(`^(` + familyIdent + `)(?:\s+"([^"]*)")?\s*(<
 
 var classFieldMember = regexp.MustCompile(`^[+#~-]?(?:` + familyIdent + `|` + familyIdent + `\s*:\s*[A-Za-z_][A-Za-z0-9_~\[\]?,. ]*|[A-Za-z_][A-Za-z0-9_~\[\]?,.]*\s+` + familyIdent + `)$`)
 var classMethodMember = regexp.MustCompile(`^[+#~-]?` + familyIdent + `\([^(){};]*\)(?:\s*:?\s*[A-Za-z_][A-Za-z0-9_~\[\]?,. ]*)?[$*]?$`)
+var classMethodParameter = regexp.MustCompile(`^(?:` + familyIdent + `|` + familyIdent + `\s*:\s*[A-Za-z_][A-Za-z0-9_~\[\]?. ]*|[A-Za-z_][A-Za-z0-9_~\[\]?.]*\s+` + familyIdent + `)$`)
 
 func supportedClassMember(line string) bool {
 	if len(line) > 2048 {
@@ -32,7 +35,22 @@ func supportedClassMember(line string) bool {
 			return false
 		}
 	}
-	return classFieldMember.MatchString(line) || classMethodMember.MatchString(line)
+	if classFieldMember.MatchString(line) {
+		return true
+	}
+	if !classMethodMember.MatchString(line) {
+		return false
+	}
+	params := strings.TrimSpace(line[strings.IndexByte(line, '(')+1 : strings.LastIndexByte(line, ')')])
+	if params == "" {
+		return true
+	}
+	for _, param := range strings.Split(params, ",") {
+		if !classMethodParameter.MatchString(strings.TrimSpace(param)) {
+			return false
+		}
+	}
+	return true
 }
 
 // These deliberately bounded line grammars preserve supported semantic data.
@@ -65,6 +83,23 @@ func parseNativeFamilies(src []byte) (*sirena.Document, []sirena.Diagnostic, err
 	if kind == "" {
 		return nil, nil, nil, false
 	}
+
+	// Reserve every possible authored generated-prefix name before allocating.
+	// Keeping generated identities in Sirena's identifier alphabet preserves
+	// native Print/Parse round trips as well as Mermaid actor separation.
+	reserved := map[string]bool{}
+	for _, name := range generatedFamilyName.FindAllString(string(src), -1) {
+		reserved[name] = true
+	}
+	allocate := func(base string) string {
+		name := base
+		for suffix := 1; reserved[name]; suffix++ {
+			name = fmt.Sprintf("%s_%d", base, suffix)
+		}
+		reserved[name] = true
+		return name
+	}
+	initialName, finalName := allocate("__sirena_initial"), allocate("__sirena_final")
 
 	sys := &sirena.SystemDecl{}
 	doc := &sirena.Document{Diagram: kind, Systems: []*sirena.SystemDecl{sys}}
@@ -119,11 +154,11 @@ func parseNativeFamilies(src []byte) (*sirena.Document, []sirena.Diagnostic, err
 			} else if m := stateLine.FindStringSubmatch(line); m != nil {
 				from, to := m[1], m[2]
 				if from == "[*]" {
-					from = "__sirena_state:initial"
+					from = initialName
 					add(from, "").Metadata["state"] = sirena.String{Value: "initial"}
 				}
 				if to == "[*]" {
-					to = "__sirena_state:final"
+					to = finalName
 					add(to, "").Metadata["state"] = sirena.String{Value: "final"}
 				}
 				edge(from, to, m[3])
@@ -168,7 +203,7 @@ func parseNativeFamilies(src []byte) (*sirena.Document, []sirena.Diagnostic, err
 			}
 		case "mindmap":
 			indent := len(raw) - len(strings.TrimLeft(raw, " \t"))
-			name := fmt.Sprintf("__sirena_mindmap:%d", i)
+			name := allocate(fmt.Sprintf("__sirena_mindmap_%d", i))
 			label := line
 			if cut := strings.IndexAny(line, "(["); cut > 0 {
 				candidate := strings.TrimSpace(line[:cut])

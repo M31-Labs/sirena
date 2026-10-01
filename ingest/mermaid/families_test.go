@@ -40,14 +40,14 @@ func TestUnsupportedFamilySyntaxIsDiagnosedAtSource(t *testing.T) {
 	}
 }
 func TestClassMemberSubsetAndRanges(t *testing.T) {
-	for _, member := range []string{"garbage", "size", "+size", "+String owner", "+name: string", "+save()", "+get(id: UUID): Item", "+all() Item[]"} {
+	for _, member := range []string{"garbage", "size", "+size", "+String owner", "+name: string", "+save()", "+get(id: UUID): Item", "+all() Item[]", "+save(id, name: string, UUID key)"} {
 		src := []byte("classDiagram\nclass A {\n" + member + "\n}\n")
 		doc, diags, err := Parse(src, Options{})
 		if err != nil || doc == nil || len(diags) != 0 {
 			t.Fatalf("valid member %q rejected: %v %+v", member, err, diags)
 		}
 	}
-	for _, member := range []string{"+save(", "+save())", "<<interface>>", "style A fill:red", "name ??? invalid"} {
+	for _, member := range []string{"+save(", "+save())", "+save(!!!)", "+save(id,,key)", "+save(+id)", "<<interface>>", "style A fill:red", "name ??? invalid"} {
 		src := []byte("classDiagram\nclass A {\n" + member + "\n}\n")
 		doc, diags, err := Parse(src, Options{})
 		if err == nil || doc != nil || len(diags) != 1 || string(src[diags[0].Range.Start:diags[0].Range.End]) != member {
@@ -58,8 +58,8 @@ func TestClassMemberSubsetAndRanges(t *testing.T) {
 
 func TestGeneratedFamilyIdentitiesCannotCollideWithAuthoredNames(t *testing.T) {
 	for _, source := range []string{
-		"stateDiagram-v2\n[*] --> __initial\n__initial --> __final\n__final --> [*]\n",
-		"mindmap\n__mindmap_2((Root))\n  Plain branch\n",
+		"stateDiagram-v2\n[*] --> __sirena_initial\n__sirena_initial --> __sirena_initial_1\n__sirena_initial_1 --> __sirena_final\n__sirena_final --> [*]\n",
+		"mindmap\n__sirena_mindmap_2((Root))\n  Plain branch\n",
 	} {
 		doc, diags, err := Parse([]byte(source), Options{})
 		if err != nil || len(diags) != 0 {
@@ -67,19 +67,27 @@ func TestGeneratedFamilyIdentitiesCannotCollideWithAuthoredNames(t *testing.T) {
 		}
 		rv := sirena.AllElementsView(doc)
 		if doc.Diagram == "state" {
-			if len(rv.Elements) != 4 || len(rv.Edges) != 3 {
+			if len(rv.Elements) != 5 || len(rv.Edges) != 4 {
 				t.Fatal("pseudo-state merged with authored state")
 			}
-			if rv.Edges[0].From == rv.Edges[0].To || rv.Edges[2].From == rv.Edges[2].To {
+			if rv.Edges[0].From == rv.Edges[0].To || rv.Edges[3].From == rv.Edges[3].To {
 				t.Fatal("distinct transition became self-edge")
 			}
 		} else if len(rv.Elements) != 2 {
 			t.Fatal("anonymous branch collided with authored root")
 		}
 		for _, element := range rv.Elements {
-			if strings.HasPrefix(element.Name, "__sirena_") && familyName.MatchString(element.Name) {
-				t.Fatal("generated identity belongs to authored namespace")
+			if strings.HasPrefix(element.Name, "__sirena_") && !familyName.MatchString(element.Name) {
+				t.Fatal("generated identity is not native-printable")
 			}
+		}
+		printed, err := sirena.Print(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		reparsed, err := sirena.Parse(printed)
+		if err != nil || len(reparsed.Diagnostics()) != 0 {
+			t.Fatal("generated identities do not round trip", err, string(printed))
 		}
 		if _, _, err := layout.Render(rv, sirena.RenderOptions{}); err != nil {
 			t.Fatal(err)
