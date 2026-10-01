@@ -42,12 +42,17 @@ func connectDiagram(lr *sirena.LayoutResult, metrics Metrics) {
 // relationships. A deterministic grid handles cyclic graphs without force
 // simulation; measured compartments keep fields and methods legible.
 func computeCards(rv *sirena.ResolvedView, seed [32]byte, metrics Metrics, kind string) (*sirena.LayoutResult, error) {
+	return computeCardsSized(rv, seed, metrics, kind, 0, 0)
+}
+
+// Storyboards can need the widest and tallest card from different states.
+func computeCardsSized(rv *sirena.ResolvedView, seed [32]byte, metrics Metrics, kind string, minWidth, minHeight float64) (*sirena.LayoutResult, error) {
 	if _, err := flatActors(rv); err != nil {
 		return nil, err
 	}
 	lr := &sirena.LayoutResult{View: rv, Seed: seed, Diagram: kind}
 	cols := max(1, int(math.Ceil(math.Sqrt(float64(len(rv.Elements))))))
-	width, height := 140.0, 48.0
+	width, height := math.Max(140, minWidth), math.Max(48, minHeight)
 	for _, e := range rv.Elements {
 		width = math.Max(width, actorWidth(e)+32)
 		if kind != "state" {

@@ -25,8 +25,9 @@ func Storyboard(views []*sirena.ResolvedView, opts sirena.RenderOptions) ([]*sir
 	var frames []*sirena.LayoutResult
 	union := &sirena.ResolvedView{}
 	byName := map[string]int{}
-	edges := map[string]bool{}
+	edges := map[string]int{}
 	sizes := map[string]float64{}
+	cardWidth, cardHeight := 0.0, 0.0
 	for i, v := range views {
 		if v == nil {
 			return nil, fmt.Errorf("sirena: state %d is nil", i)
@@ -43,6 +44,8 @@ func Storyboard(views []*sirena.ResolvedView, opts sirena.RenderOptions) ([]*sir
 		}
 		frames = append(frames, lr)
 		for _, np := range lr.NodePlacements {
+			cardWidth = math.Max(cardWidth, np.Bounds.Width())
+			cardHeight = math.Max(cardHeight, np.Bounds.Height())
 			e := np.Node
 			size := np.Bounds.Width() * np.Bounds.Height()
 			index, ok := byName[e.Name]
@@ -58,9 +61,11 @@ func Storyboard(views []*sirena.ResolvedView, opts sirena.RenderOptions) ([]*sir
 		}
 		for _, e := range v.Edges {
 			key := fmt.Sprintf("%s\x00%s\x00%d\x00%d", e.From, e.To, e.Kind, e.Direction)
-			if !edges[key] {
-				edges[key] = true
+			if index, exists := edges[key]; !exists {
+				edges[key] = len(union.Edges)
 				union.Edges = append(union.Edges, e)
+			} else if labelWidth(e.Label) > labelWidth(union.Edges[index].Label) {
+				union.Edges[index] = e
 			}
 		}
 	}
@@ -151,6 +156,15 @@ func Storyboard(views []*sirena.ResolvedView, opts sirena.RenderOptions) ([]*sir
 		reference, _, err := Render(union, sirena.RenderOptions{Diagram: kind})
 		if err != nil {
 			return nil, fmt.Errorf("storyboard union: %w", err)
+		}
+		if (kind == "class" || kind == "er" || kind == "state") && len(reference.NodePlacements) > 0 {
+			slot := reference.NodePlacements[0].Bounds
+			if slot.Width() < cardWidth || slot.Height() < cardHeight {
+				reference, err = computeCardsSized(reference.View, reference.Seed, DefaultMetrics(), kind, cardWidth, cardHeight)
+				if err != nil {
+					return nil, fmt.Errorf("storyboard cards: %w", err)
+				}
+			}
 		}
 		slots := map[string]sirena.Rect{}
 		for _, np := range reference.NodePlacements {

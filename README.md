@@ -95,6 +95,9 @@ This writes numbered SVG states and `storyboard.json` with a transition duration
 flat architecture/state/class/ER/mindmap actors reserve union slots, bars reserve
 rows, and line/scatter/radar charts share numerical scales. Up to 32 states,
 1000 union nodes and 2000 union relationships; caller metadata stays immutable.
+Class and ER stories reserve width and height independently across every state,
+so a wide title or field stays readable when another state adds more rows.
+Relationship gutters reserve the longest caption seen across the story.
 Radar axis order must match. Unsupported families and incompatible mindmap unions
 fail explicitly. Repeated labels share whole glyph runs and glyph outlines, reducing bytes and DOM nodes
 without substituting system fonts. Each SVG retains `data-morph-id` identities for presentation animation.
