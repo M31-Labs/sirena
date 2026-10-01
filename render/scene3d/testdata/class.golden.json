@@ -1,0 +1,402 @@
+{
+  "adaptiveQuality": true,
+  "ariaLabel": "Sirena diagram; Order; id: UUID; total: Money; submit(); cancel(); OrderItem; sku: string; quantity: int; subtotal(); 1 to many",
+  "background": "transparent",
+  "camera": {
+    "far": 100,
+    "fov": 50,
+    "near": 0.1,
+    "z": 11
+  },
+  "canvasAlpha": true,
+  "dragToRotate": true,
+  "fillHeight": true,
+  "maxDevicePixelRatio": 1.5,
+  "maxFrameRate": 30,
+  "maxPixels": 2000000,
+  "responsive": true,
+  "scene": {
+    "backendCaps": {
+      "capable": [
+        "webgpu",
+        "webgl",
+        "canvas2d"
+      ]
+    },
+    "environment": {
+      "ambientIntensity": 0.85
+    },
+    "labels": [
+      {
+        "anchorX": 0.5,
+        "anchorY": 0.5,
+        "background": "transparent",
+        "borderColor": "transparent",
+        "collision": "allow",
+        "color": "#102b32",
+        "font": "600 14px sans-serif",
+        "id": "label:order",
+        "lineHeight": 16,
+        "maxLines": 1,
+        "maxWidth": 320,
+        "overflow": "ellipsis",
+        "priority": 100,
+        "text": "Order",
+        "whiteSpace": "pre",
+        "x": -3.7588560827922586,
+        "y": 1.5367844003710227,
+        "z": 0.2
+      },
+      {
+        "anchorX": 1e-9,
+        "anchorY": 0.5,
+        "background": "transparent",
+        "borderColor": "transparent",
+        "collision": "allow",
+        "color": "#102b32",
+        "font": "14px sans-serif",
+        "id": "label:order:fields:0",
+        "lineHeight": 16,
+        "maxLines": 1,
+        "maxWidth": 320,
+        "offsetX": -10,
+        "overflow": "ellipsis",
+        "priority": 100,
+        "text": "id: UUID",
+        "whiteSpace": "pre",
+        "x": -5.615803899907244,
+        "y": 0.7683922001855114,
+        "z": 0.2
+      },
+      {
+        "anchorX": 1e-9,
+        "anchorY": 0.5,
+        "background": "transparent",
+        "borderColor": "transparent",
+        "collision": "allow",
+        "color": "#102b32",
+        "font": "14px sans-serif",
+        "id": "label:order:fields:1",
+        "lineHeight": 16,
+        "maxLines": 1,
+        "maxWidth": 320,
+        "offsetX": -10,
+        "overflow": "ellipsis",
+        "priority": 100,
+        "text": "total: Money",
+        "whiteSpace": "pre",
+        "x": -5.615803899907244,
+        "z": 0.2
+      },
+      {
+        "anchorX": 1e-9,
+        "anchorY": 0.5,
+        "background": "transparent",
+        "borderColor": "transparent",
+        "collision": "allow",
+        "color": "#102b32",
+        "font": "14px sans-serif",
+        "id": "label:order:methods:0",
+        "lineHeight": 16,
+        "maxLines": 1,
+        "maxWidth": 320,
+        "offsetX": -10,
+        "overflow": "ellipsis",
+        "priority": 100,
+        "text": "submit()",
+        "whiteSpace": "pre",
+        "x": -5.615803899907244,
+        "y": -0.7683922001855114,
+        "z": 0.2
+      },
+      {
+        "anchorX": 1e-9,
+        "anchorY": 0.5,
+        "background": "transparent",
+        "borderColor": "transparent",
+        "collision": "allow",
+        "color": "#102b32",
+        "font": "14px sans-serif",
+        "id": "label:order:methods:1",
+        "lineHeight": 16,
+        "maxLines": 1,
+        "maxWidth": 320,
+        "offsetX": -10,
+        "overflow": "ellipsis",
+        "priority": 100,
+        "text": "cancel()",
+        "whiteSpace": "pre",
+        "x": -5.615803899907244,
+        "y": -1.5367844003710227,
+        "z": 0.2
+      },
+      {
+        "anchorX": 0.5,
+        "anchorY": 0.5,
+        "background": "transparent",
+        "borderColor": "transparent",
+        "collision": "allow",
+        "color": "#102b32",
+        "font": "600 14px sans-serif",
+        "id": "label:item",
+        "lineHeight": 16,
+        "maxLines": 1,
+        "maxWidth": 320,
+        "overflow": "ellipsis",
+        "priority": 100,
+        "text": "OrderItem",
+        "whiteSpace": "pre",
+        "x": 3.7588560827922586,
+        "y": 1.5367844003710227,
+        "z": 0.2
+      },
+      {
+        "anchorX": 1e-9,
+        "anchorY": 0.5,
+        "background": "transparent",
+        "borderColor": "transparent",
+        "collision": "allow",
+        "color": "#102b32",
+        "font": "14px sans-serif",
+        "id": "label:item:fields:0",
+        "lineHeight": 16,
+        "maxLines": 1,
+        "maxWidth": 320,
+        "offsetX": -10,
+        "overflow": "ellipsis",
+        "priority": 100,
+        "text": "sku: string",
+        "whiteSpace": "pre",
+        "x": 1.9019082656772728,
+        "y": 0.7683922001855114,
+        "z": 0.2
+      },
+      {
+        "anchorX": 1e-9,
+        "anchorY": 0.5,
+        "background": "transparent",
+        "borderColor": "transparent",
+        "collision": "allow",
+        "color": "#102b32",
+        "font": "14px sans-serif",
+        "id": "label:item:fields:1",
+        "lineHeight": 16,
+        "maxLines": 1,
+        "maxWidth": 320,
+        "offsetX": -10,
+        "overflow": "ellipsis",
+        "priority": 100,
+        "text": "quantity: int",
+        "whiteSpace": "pre",
+        "x": 1.9019082656772728,
+        "z": 0.2
+      },
+      {
+        "anchorX": 1e-9,
+        "anchorY": 0.5,
+        "background": "transparent",
+        "borderColor": "transparent",
+        "collision": "allow",
+        "color": "#102b32",
+        "font": "14px sans-serif",
+        "id": "label:item:methods:0",
+        "lineHeight": 16,
+        "maxLines": 1,
+        "maxWidth": 320,
+        "offsetX": -10,
+        "overflow": "ellipsis",
+        "priority": 100,
+        "text": "subtotal()",
+        "whiteSpace": "pre",
+        "x": 1.9019082656772728,
+        "y": -0.7683922001855114,
+        "z": 0.2
+      },
+      {
+        "anchorX": 0.5,
+        "anchorY": 0.5,
+        "background": "#101923",
+        "collision": "allow",
+        "color": "#bacdd2",
+        "font": "12px sans-serif",
+        "id": "label:edge:0",
+        "lineHeight": 16,
+        "maxLines": 1,
+        "maxWidth": 320,
+        "offsetY": 14,
+        "overflow": "ellipsis",
+        "text": "1 to many",
+        "whiteSpace": "pre",
+        "y": 0.25613073339517045
+      }
+    ],
+    "objects": [
+      {
+        "color": "#88cab9",
+        "depth": 0.35,
+        "height": 4.354222467717897,
+        "id": "order",
+        "kind": "box",
+        "materialKind": "standard",
+        "metalness": 0.15,
+        "roughness": 0.35,
+        "width": 4.482287834415483,
+        "wireframe": false,
+        "x": -3.7588560827922586
+      },
+      {
+        "color": "#3e5362",
+        "emissive": 1,
+        "id": "record:order:dividers",
+        "kind": "lines",
+        "lineSegments": [
+          [
+            0,
+            1
+          ],
+          [
+            2,
+            3
+          ]
+        ],
+        "lineWidth": 1,
+        "materialKind": "standard",
+        "points": [
+          {
+            "x": -2.2411439172077414,
+            "y": 1.152588300278267,
+            "z": 0.18
+          },
+          {
+            "x": 2.2411439172077414,
+            "y": 1.152588300278267,
+            "z": 0.18
+          },
+          {
+            "x": -2.2411439172077414,
+            "y": -0.3841961000927557,
+            "z": 0.18
+          },
+          {
+            "x": 2.2411439172077414,
+            "y": -0.3841961000927557,
+            "z": 0.18
+          }
+        ],
+        "wireframe": false,
+        "x": -3.7588560827922586
+      },
+      {
+        "color": "#88cab9",
+        "depth": 0.35,
+        "height": 4.354222467717897,
+        "id": "item",
+        "kind": "box",
+        "materialKind": "standard",
+        "metalness": 0.15,
+        "roughness": 0.35,
+        "width": 4.482287834415483,
+        "wireframe": false,
+        "x": 3.7588560827922586
+      },
+      {
+        "color": "#3e5362",
+        "emissive": 1,
+        "id": "record:item:dividers",
+        "kind": "lines",
+        "lineSegments": [
+          [
+            0,
+            1
+          ],
+          [
+            2,
+            3
+          ]
+        ],
+        "lineWidth": 1,
+        "materialKind": "standard",
+        "points": [
+          {
+            "x": -2.2411439172077414,
+            "y": 1.152588300278267,
+            "z": 0.18
+          },
+          {
+            "x": 2.2411439172077414,
+            "y": 1.152588300278267,
+            "z": 0.18
+          },
+          {
+            "x": -2.2411439172077414,
+            "y": -0.3841961000927557,
+            "z": 0.18
+          },
+          {
+            "x": 2.2411439172077414,
+            "y": -0.3841961000927557,
+            "z": 0.18
+          }
+        ],
+        "wireframe": false,
+        "x": 3.7588560827922586
+      },
+      {
+        "color": "#658d98",
+        "emissive": 1,
+        "id": "edge:0",
+        "kind": "lines",
+        "lineSegments": [
+          [
+            0,
+            1
+          ],
+          [
+            2,
+            3
+          ],
+          [
+            4,
+            5
+          ]
+        ],
+        "lineWidth": 2,
+        "materialKind": "standard",
+        "points": [
+          {
+            "x": -1.5177121655845172,
+            "y": 0,
+            "z": -0.25
+          },
+          {
+            "x": 1.5177121655845172,
+            "y": 0,
+            "z": -0.25
+          },
+          {
+            "x": 1.5177121655845172,
+            "y": 0,
+            "z": -0.25
+          },
+          {
+            "x": 1.3377121655845172,
+            "y": -0.09,
+            "z": -0.25
+          },
+          {
+            "x": 1.5177121655845172,
+            "y": 0,
+            "z": -0.25
+          },
+          {
+            "x": 1.3377121655845172,
+            "y": 0.09,
+            "z": -0.25
+          }
+        ],
+        "wireframe": false
+      }
+    ],
+    "shadowMaxPixels": 1048576
+  }
+}
