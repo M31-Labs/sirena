@@ -4,6 +4,11 @@ All notable changes to sirena will be documented in this file.
 
 ## Unreleased
 
+## v0.6.1 — 2026-10-01
+
+- Keep class and ER storyboard cards wide and tall enough for every authored state.
+- Reserve relationship gutters for captions that grow in later states without changing actor positions.
+
 ## v0.6.0 — 2026-10-01
 
 - Add line/scatter, radar and weighted DAG Sankey diagrams, with native Scene3D projections for line/scatter and radar.
