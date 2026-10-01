@@ -39,8 +39,10 @@ Mermaid flowcharts can also use `--scene3d --infer`.
 Keyframes are a JSON array of `{ "label": "Focus API", "patches": [{ "target":
 "api", "z": 1.4, "scale": 1.35 }] }`. Supported pose fields are `x`, `y`, `z`,
 and positive `scale`. Each frame is absolute relative to the original layout;
-omitted fields restore that layout, so backward and direct seeks agree. Labels
-follow positioned nodes; edges retain their original routes. The exported
+omitted fields restore that layout, so backward and direct seeks agree. Labels,
+relationship endpoints, arrowheads and captions follow positioned or scaled
+actors. Explicitly hiding an actor hides its attached relationships unless an
+edge visibility patch overrides it. The exported
 `slideSteps` version 1 transport contains native GoSX commands for each frame.
 The first frame is the initial state; subsequent frames are presentation steps.
 
@@ -159,6 +161,13 @@ need their unique edge ID (`edge:0`, etc.) instead of an ambiguous `from->to` al
 Each beat is an absolute pose; omitted actions restore the original state, so
 links, reverse navigation, and replay do not depend on earlier steps. Timelines
 are bounded to 128 frames / 4 MiB.
+
+Steps can include `durationMs` (0–600,000, zero selects the host default),
+`easing` (`linear`, `ease`, `ease-in`, `ease-out`, `ease-in-out`), and `camera`.
+Camera fields use GoSX's canonical `kind`, `x`, `y`, `z`, `rotationX/Y/Z`, `fov`,
+`near` and `far` shape. Omitted camera beats restore the default view; each camera
+command is absolute, allowing a host playhead to interpolate without another
+independent camera animation.
 
 SVG nodes expose `data-sirena-id` and `data-morph-id` for selection and shared
 transitions in hosts such as gosx-slides. `sirena version` reports the CLI release.

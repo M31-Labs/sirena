@@ -30,11 +30,14 @@ type Options struct {
 // Step is an absolute keyframe. Missing fields restore the original layout,
 // making direct seeks and backwards navigation independent of prior steps.
 type Step struct {
-	Label   string   `json:"label"`
-	Patches []Patch  `json:"patches,omitempty"`
-	Focus   []string `json:"focus,omitempty"`
-	Reveal  []string `json:"reveal,omitempty"`
-	Trace   []string `json:"trace,omitempty"`
+	Label      string          `json:"label"`
+	Patches    []Patch         `json:"patches,omitempty"`
+	Focus      []string        `json:"focus,omitempty"`
+	Reveal     []string        `json:"reveal,omitempty"`
+	Trace      []string        `json:"trace,omitempty"`
+	DurationMS int             `json:"durationMs,omitempty"`
+	Easing     string          `json:"easing,omitempty"`
+	Camera     *scene.IRCamera `json:"camera,omitempty"`
 }
 type Patch struct {
 	Target  string   `json:"target"`
@@ -46,8 +49,10 @@ type Patch struct {
 	Scale   *float64 `json:"scale,omitempty"`
 }
 type Frame struct {
-	Label    string          `json:"label"`
-	Commands []scene.Command `json:"commands"`
+	Label      string          `json:"label"`
+	Commands   []scene.Command `json:"commands"`
+	DurationMS int             `json:"durationMs,omitempty"`
+	Easing     string          `json:"easing,omitempty"`
 }
 type Timeline struct {
 	Version int     `json:"version"`
@@ -397,7 +402,7 @@ func Build(lr *sirena.LayoutResult, opts Options) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		timeline, err := buildTimeline(props.SceneIR(), steps)
+		timeline, err := buildTimeline(props.SceneIR(), steps, edgeAttachments(lr))
 		if err != nil {
 			return nil, err
 		}
@@ -408,7 +413,7 @@ func Build(lr *sirena.LayoutResult, opts Options) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		timeline, err := buildTimeline(props.SceneIR(), steps)
+		timeline, err := buildTimeline(props.SceneIR(), steps, edgeAttachments(lr))
 		if err != nil {
 			return nil, err
 		}
@@ -444,7 +449,7 @@ func nodeLabel(id, text string, height float64) scene.Label {
 	}
 }
 
-func buildTimeline(ir scene.SceneIR, steps []Step) (Timeline, error) {
+func buildTimeline(ir scene.SceneIR, steps []Step, attachments ...map[string]edgeAttachment) (Timeline, error) {
 	if len(steps) > 128 {
 		return Timeline{}, fmt.Errorf("sirena scene3d: at most 128 keyframes")
 	}
@@ -458,7 +463,36 @@ func buildTimeline(ir scene.SceneIR, steps []Step) (Timeline, error) {
 	}
 	targets := map[string]bool{}
 	replacements := map[string]bool{}
+	links := map[string]edgeAttachment{}
+	if len(attachments) > 0 {
+		links = attachments[0]
+	}
+	for id, link := range links {
+		for _, step := range steps {
+			for _, p := range step.Patches {
+				if p.Target == link.From || p.Target == link.To {
+					targets[id] = true
+					replacements[id] = true
+				}
+			}
+		}
+	}
+	cameraSteps := false
 	for _, step := range steps {
+		if step.DurationMS < 0 || step.DurationMS > 600000 {
+			return Timeline{}, fmt.Errorf("sirena scene3d: durationMs must be between 0 and 600000")
+		}
+		switch step.Easing {
+		case "", "linear", "ease", "ease-in", "ease-out", "ease-in-out":
+		default:
+			return Timeline{}, fmt.Errorf("sirena scene3d: unknown easing %q", step.Easing)
+		}
+		if step.Camera != nil {
+			if err := validateStoryCamera(*step.Camera); err != nil {
+				return Timeline{}, err
+			}
+			cameraSteps = true
+		}
 		for _, patch := range step.Patches {
 			if _, ok := objects[patch.Target]; !ok {
 				return Timeline{}, fmt.Errorf("sirena scene3d: unknown step target %q", patch.Target)
@@ -484,7 +518,7 @@ func buildTimeline(ir scene.SceneIR, steps []Step) (Timeline, error) {
 	sort.Strings(ids)
 	timeline := Timeline{Version: 1}
 	for _, step := range steps {
-		frame := Frame{Label: step.Label, Commands: []scene.Command{}}
+		frame := Frame{Label: step.Label, Commands: []scene.Command{}, DurationMS: step.DurationMS, Easing: step.Easing}
 		patches := map[string]Patch{}
 		for _, patch := range step.Patches {
 			if _, ok := patches[patch.Target]; ok {
@@ -495,6 +529,18 @@ func buildTimeline(ir scene.SceneIR, steps []Step) (Timeline, error) {
 		for _, id := range ids {
 			obj := objects[id]
 			patch := patches[id]
+			var edgeLabel *scene.LabelIR
+			if link, ok := links[id]; ok && obj.Kind == "lines" {
+				obj, edgeLabel = poseRelationship(obj, labels["label:"+id], link, objects, patches)
+				if patch.Visible == nil {
+					visible := patches[link.From].Visible
+					other := patches[link.To].Visible
+					if visible != nil && !*visible || other != nil && !*other {
+						hidden := false
+						patch.Visible = &hidden
+					}
+				}
+			}
 			if replacements[id] {
 				frame.Commands = append(frame.Commands, scene.Command{Kind: scene.CommandRemoveObject, ObjectID: id})
 				if patch.Visible != nil && !*patch.Visible {
@@ -537,11 +583,39 @@ func buildTimeline(ir scene.SceneIR, steps []Step) (Timeline, error) {
 			// Labels are separate projected objects. Every visible frame recreates
 			// the original label, including a reveal after a hidden frame.
 			if label, ok := labels["label:"+id]; ok {
-				label.X += x - obj.X
-				label.Y += y - obj.Y
-				label.Z += z - obj.Z
+				if edgeLabel != nil {
+					label = *edgeLabel
+				} else {
+					factor := 1.0
+					if patch.Scale != nil {
+						factor = *patch.Scale
+					}
+					label.X = x + (label.X-obj.X)*factor
+					label.Y = y + (label.Y-obj.Y)*factor
+					label.Z = z + (label.Z-obj.Z)*factor
+				}
 				frame.Commands = append(frame.Commands, scene.Command{Kind: scene.CommandRemoveObject, ObjectID: label.ID}, scene.CreateLabelCommand(label))
 			}
+		}
+		if cameraSteps {
+			camera := scene.IRCamera{Kind: "perspective", Z: 11, FOV: 50, Near: .1, Far: 100}
+			if step.Camera != nil {
+				camera = *step.Camera
+				if camera.Kind == "" {
+					camera.Kind = "perspective"
+				}
+				if camera.Kind == "perspective" && camera.FOV == 0 {
+					camera.FOV = 50
+				}
+				if camera.Near == 0 {
+					camera.Near = .1
+				}
+				if camera.Far == 0 {
+					camera.Far = 100
+				}
+			}
+			camera.TransitionMS = 0
+			frame.Commands = append(frame.Commands, scene.SetCameraCommand(camera))
 		}
 		timeline.Frames = append(timeline.Frames, frame)
 	}
