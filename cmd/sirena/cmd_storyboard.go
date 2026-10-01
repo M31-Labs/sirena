@@ -8,6 +8,8 @@ import (
 	"m31labs.dev/sirena/fence"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 )
 
 // RunStoryboard writes stable SVG states and a portable frame manifest.
@@ -43,6 +45,20 @@ func RunStoryboard(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
+	// Only remove frames recorded by our previous manifest. Preserve unrelated
+	// files and never let a manifest path escape this output directory.
+	var previous struct {
+		Frames []string `json:"frames"`
+	}
+	if data, readErr := os.ReadFile(filepath.Join(*out, "storyboard.json")); readErr == nil {
+		if err := json.Unmarshal(data, &previous); err != nil {
+			fmt.Fprintln(stderr, "invalid previous storyboard manifest:", err)
+			return 1
+		}
+	} else if !os.IsNotExist(readErr) {
+		fmt.Fprintln(stderr, readErr)
+		return 1
+	}
 	names := []string{}
 	for i, data := range frames {
 		name := fmt.Sprintf("state-%02d.svg", i)
@@ -51,6 +67,16 @@ func RunStoryboard(args []string, stdout, stderr io.Writer) int {
 			return 1
 		}
 		names = append(names, name)
+	}
+	for _, name := range previous.Frames {
+		i, parseErr := strconv.Atoi(strings.TrimSuffix(strings.TrimPrefix(name, "state-"), ".svg"))
+		if parseErr != nil || i < len(frames) || i >= 32 || name != fmt.Sprintf("state-%02d.svg", i) {
+			continue
+		}
+		if err := os.Remove(filepath.Join(*out, name)); err != nil && !os.IsNotExist(err) {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
 	}
 	manifest, _ := json.MarshalIndent(struct {
 		Frames   []string `json:"frames"`
