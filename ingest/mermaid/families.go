@@ -1,6 +1,7 @@
 package mermaid
 
 import (
+	"bytes"
 	"fmt"
 	"regexp"
 	"strings"
@@ -56,19 +57,17 @@ func supportedClassMember(line string) bool {
 // These deliberately bounded line grammars preserve supported semantic data.
 // Control blocks, notes and styling are diagnosed instead of silently flattened.
 func parseNativeFamilies(src []byte) (*sirena.Document, []sirena.Diagnostic, error, bool) {
-	if len(src) > 4<<20 {
-		return nil, nil, fmt.Errorf("Mermaid source exceeds 4 MiB"), true
-	}
-	lines := strings.Split(string(src), "\n")
 	header := -1
 	kind := ""
-	for i, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "%%") {
+	for i, rest := 0, src; len(rest) > 0; i++ {
+		line, tail, _ := bytes.Cut(rest, []byte("\n"))
+		rest = tail
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 || bytes.HasPrefix(line, []byte("%%")) {
 			continue
 		}
 		header = i
-		switch line {
+		switch string(line) {
 		case "sequenceDiagram":
 			kind = "sequence"
 		case "stateDiagram", "stateDiagram-v2":
@@ -83,6 +82,10 @@ func parseNativeFamilies(src []byte) (*sirena.Document, []sirena.Diagnostic, err
 	if kind == "" {
 		return nil, nil, nil, false
 	}
+	if len(src) > 4<<20 {
+		return nil, nil, fmt.Errorf("Mermaid source exceeds 4 MiB"), true
+	}
+	lines := strings.Split(string(src), "\n")
 
 	// Reserve every possible authored generated-prefix name before allocating.
 	// Keeping generated identities in Sirena's identifier alphabet preserves

@@ -1,11 +1,26 @@
 package mermaid
 
 import (
+	"bytes"
 	"m31labs.dev/sirena"
 	"m31labs.dev/sirena/layout"
 	"strings"
 	"testing"
 )
+
+func TestNativeFamilySizeBoundPreservesLegacyRouting(t *testing.T) {
+	large := bytes.Repeat([]byte("a"), 4<<20)
+	for _, header := range []string{"flowchart LR\n", "graph TD\n"} {
+		source := append([]byte(header+"%% "), large...)
+		if _, _, err, handled := parseNativeFamilies(source); err != nil || handled {
+			t.Fatal("legacy graph intercepted", header, err)
+		}
+	}
+	source := append([]byte("sequenceDiagram\n%% "), large...)
+	if _, _, err, handled := parseNativeFamilies(source); err == nil || !handled {
+		t.Fatal("native size ceiling bypassed")
+	}
+}
 
 func TestNativeFamilySemantics(t *testing.T) {
 	cases := []struct {
