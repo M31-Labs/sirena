@@ -76,6 +76,39 @@ source -> b: flow "90"`)
 		t.Fatal("cycle accepted")
 	}
 }
+
+func TestSankeySubnormalWeightsHaveFiniteProportionalGeometry(t *testing.T) {
+	flow := chartView(t, `service source
+service a
+service b
+source -> a: flow "1"
+source -> b: flow "3"`)
+	for i, edge := range flow.Edges {
+		edge.Metadata = map[string]sirena.Value{"value": sirena.Number{Value: float64(1+2*i) * math.SmallestNonzeroFloat64}}
+	}
+	lr, _, err := Render(flow, sirena.RenderOptions{Diagram: "sankey"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	finite := func(v float64) {
+		if math.IsNaN(v) || math.IsInf(v, 0) {
+			t.Fatal("non-finite Sankey geometry", v)
+		}
+	}
+	for _, node := range lr.NodePlacements {
+		for _, v := range []float64{node.Bounds.Min.X, node.Bounds.Min.Y, node.Bounds.Max.X, node.Bounds.Max.Y} {
+			finite(v)
+		}
+	}
+	for _, f := range lr.Flows {
+		for _, v := range []float64{f.Width, f.From.X, f.From.Y, f.To.X, f.To.Y} {
+			finite(v)
+		}
+	}
+	if math.Abs(lr.Flows[1].Width/lr.Flows[0].Width-3) > 1e-9 || lr.Flows[0].Value != math.SmallestNonzeroFloat64 {
+		t.Fatal("flow proportions or original values lost")
+	}
+}
 func TestStableGraphAndBarSlots(t *testing.T) {
 	a := chartView(t, `service a { value: 1 }
 service b { value: 2 }

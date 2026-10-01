@@ -224,13 +224,15 @@ func computeSankey(rv *sirena.ResolvedView, seed [32]byte, metrics Metrics) (*si
 		}
 		maxTotal = math.Max(maxTotal, sum)
 	}
-	unit := 360 / maxTotal
+	// Divide bounded values by the total before multiplying by pixels. Taking
+	// the inverse total first overflows for valid positive subnormal weights.
+	scale := func(value float64) float64 { return (value / maxTotal) * 360 }
 	lr := &sirena.LayoutResult{View: rv, Seed: seed, Diagram: "sankey"}
 	placements := make([]*sirena.NodePlacement, n)
 	for column, level := range levels {
 		y := 24.0
 		for _, i := range level {
-			height := math.Max(32, math.Max(in[i], out[i])*unit)
+			height := math.Max(32, scale(math.Max(in[i], out[i])))
 			x := float64(column) * (width + 160)
 			placements[i] = &sirena.NodePlacement{Node: rv.Elements[i], Bounds: sirena.Rect{Min: sirena.Point{X: x, Y: y}, Max: sirena.Point{X: x + width, Y: y + height}}}
 			y += height + 32
@@ -241,9 +243,9 @@ func computeSankey(rv *sirena.ResolvedView, seed [32]byte, metrics Metrics) (*si
 	for i, e := range rv.Edges {
 		a, b := index[e.From], index[e.To]
 		ra, rb := placements[a].Bounds, placements[b].Bounds
-		w := weights[i] * unit
-		from := sirena.Point{X: ra.Max.X, Y: ra.Center().Y - out[a]*unit/2 + usedOut[a] + w/2}
-		to := sirena.Point{X: rb.Min.X, Y: rb.Center().Y - in[b]*unit/2 + usedIn[b] + w/2}
+		w := scale(weights[i])
+		from := sirena.Point{X: ra.Max.X, Y: ra.Center().Y - scale(out[a])/2 + usedOut[a] + w/2}
+		to := sirena.Point{X: rb.Min.X, Y: rb.Center().Y - scale(in[b])/2 + usedIn[b] + w/2}
 		usedOut[a] += w
 		usedIn[b] += w
 		lr.Flows = append(lr.Flows, sirena.FlowPlacement{Edge: e, From: from, To: to, Width: w, Value: weights[i]})
