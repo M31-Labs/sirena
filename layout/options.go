@@ -1,5 +1,7 @@
 package layout
 
+import "m31labs.dev/sirena"
+
 // LayoutPreset selects which layout algorithm Compute runs.
 type LayoutPreset int
 
@@ -50,4 +52,9 @@ type LayoutOptions struct {
 	// derive the seed from sirena.ViewHash(rv), which is the production
 	// path; tests set it to pin or perturb force-directed output.
 	Seed *[32]byte
+	// Previous keeps existing actor centers during an edit. New or enlarged
+	// actors move only when needed to avoid overlaps. Supported for architecture,
+	// state, class, ER and mindmap; numerical chart positions remain data-derived.
+	// The previous result and all source metadata remain read-only.
+	Previous *sirena.LayoutResult
 }

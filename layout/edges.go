@@ -56,6 +56,12 @@ func assignPorts(placements []*sirena.NodePlacement, edges []*sirena.Edge) map[*
 			continue
 		}
 		srcSide, tgtSide := facingSides(rs, rd)
+		if side, _, ok := explicitPort(e, "source_port"); ok {
+			srcSide = side
+		}
+		if side, _, ok := explicitPort(e, "target_port"); ok {
+			tgtSide = side
+		}
 		info[e] = sideInfo{srcName: s, tgtName: d, srcSide: srcSide, tgtSide: tgtSide, ok: true}
 		group[gkey{s, srcSide}] = append(group[gkey{s, srcSide}], epRef{e, 0})
 		group[gkey{d, tgtSide}] = append(group[gkey{d, tgtSide}], epRef{e, 1})
@@ -81,6 +87,12 @@ func assignPorts(placements []*sirena.NodePlacement, edges []*sirena.Edge) map[*
 			continue
 		}
 		offs := portOffset[e]
+		if _, offset, ok := explicitPort(e, "source_port"); ok && offset != nil {
+			offs[0] = *offset
+		}
+		if _, offset, ok := explicitPort(e, "target_port"); ok && offset != nil {
+			offs[1] = *offset
+		}
 		out[e] = edgePorts{
 			Source: makePort(rectOf[si.srcName], si.srcSide, offs[0]),
 			Target: makePort(rectOf[si.tgtName], si.tgtSide, offs[1]),
@@ -151,20 +163,18 @@ const (
 func routeEdges(placements []*sirena.NodePlacement, ports map[*sirena.Edge]edgePorts, edges []*sirena.Edge) []*sirena.EdgeRoute {
 	ordered := append([]*sirena.Edge(nil), edges...)
 	sort.SliceStable(ordered, func(i, j int) bool { return edgeLess(ordered[i], ordered[j]) })
+	obstacles := make([]sirena.Rect, 0, len(placements))
+	for _, p := range placements {
+		if p.Node != nil {
+			obstacles = append(obstacles, p.Bounds)
+		}
+	}
 
 	var routes []*sirena.EdgeRoute
 	for _, e := range ordered {
 		ep, ok := ports[e]
 		if !ok {
 			continue
-		}
-		s, d := edgeEndpoints(e)
-		var obstacles []sirena.Rect
-		for _, p := range placements {
-			if p.Node == nil || p.Node.Name == s || p.Node.Name == d {
-				continue
-			}
-			obstacles = append(obstacles, p.Bounds)
 		}
 		routes = append(routes, &sirena.EdgeRoute{
 			Edge:       e,
@@ -205,7 +215,14 @@ func routeEdge(sp, tp sirena.Port, obstacles []sirena.Rect) []sirena.Point {
 	pts = append(pts, sa, s)
 	pts = append(pts, mid...)
 	pts = append(pts, t, ta)
-	return simplify(pts)
+	pts = simplify(pts)
+	if routeClear(pts, obstacles) {
+		return pts
+	}
+	if middle, ok := visibilityRoute(s, t, obstacles); ok {
+		return simplify(append(append([]sirena.Point{sa}, middle...), ta))
+	}
+	return pts
 }
 
 // routeHH connects two horizontally-exiting stubs. When they share a Y
@@ -396,21 +413,39 @@ func placeLabels(routes []*sirena.EdgeRoute, placements []*sirena.NodePlacement,
 			}
 		}
 		if !found {
-			// Best effort: keep the label at the midpoint even though it
-			// could not be cleared.
 			pt, dir := pointAtDist(r.Points, mid)
 			perp := perpUp(dir)
-			c := sirena.Point{X: pt.X + perp.X*labelHeight/2, Y: pt.Y + perp.Y*labelHeight/2}
-			chosen = sirena.EdgeLabel{
-				Text:   r.Edge.Label,
-				Anchor: c,
-				Bounds: sirena.Rect{
-					Min: sirena.Point{X: c.X - w/2, Y: c.Y - labelHeight/2},
-					Max: sirena.Point{X: c.X + w/2, Y: c.Y + labelHeight/2},
-				},
+			clear := func(c sirena.Point) bool {
+				b := sirena.Rect{Min: sirena.Point{X: c.X - w/2, Y: c.Y - labelHeight/2}, Max: sirena.Point{X: c.X + w/2, Y: c.Y + labelHeight/2}}
+				for _, o := range obstacles {
+					if b.Intersects(o) {
+						return false
+					}
+				}
+				chosen = sirena.EdgeLabel{Text: r.Edge.Label, Anchor: c, Bounds: b}
+				return true
+			}
+			for distance := labelHeight; distance <= 256 && !found; distance += labelStep {
+				for _, sign := range []float64{1, -1} {
+					if clear(sirena.Point{X: pt.X + perp.X*distance*sign, Y: pt.Y + perp.Y*distance*sign}) {
+						found = true
+						break
+					}
+				}
+			}
+			if !found {
+				// Dense captions still remain readable: reserve an outer gutter.
+				x := pt.X
+				for _, o := range obstacles {
+					x = max(x, o.Max.X)
+				}
+				clear(sirena.Point{X: x + w/2 + labelHeight, Y: pt.Y})
 			}
 		}
 		r.Label = &chosen
+		// Reserve captions as well as actors; parallel relationships must not
+		// paint their text on top of an earlier relationship's caption.
+		obstacles = append(obstacles, chosen.Bounds)
 	}
 }
 
