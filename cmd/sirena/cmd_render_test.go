@@ -181,7 +181,7 @@ func TestRunRender_InferFlag_FlipsCylinderToDatabase(t *testing.T) {
 
 func TestRunRender_NonGraphMmd_NonZeroExitDiagnosticOnStderr(t *testing.T) {
 	dir := writeWorkspace(t, map[string]string{
-		"seq.mmd": "sequenceDiagram\n  A->>B: hi",
+		"seq.mmd": "journey\n  A->>B: hi",
 	})
 	var out, errBuf bytes.Buffer
 	code := RunRender([]string{filepath.Join(dir, "seq.mmd")}, &out, &errBuf)

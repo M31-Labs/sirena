@@ -41,3 +41,27 @@ func TestPieRejectsUnsupported3D(t *testing.T) {
 		t.Fatal("pie silently exported legend as geometry")
 	}
 }
+func TestNativePlotsKeepDataAndAxes(t *testing.T) {
+	for _, kind := range []string{"line", "scatter", "radar"} {
+		doc, err := sirena.Parse([]byte(`service a { x: 0 y: 1 value: 1 axis: "Speed" }
+service b { x: 1 y: 2 value: 2 axis: "Clarity" }
+service c { x: 2 y: 4 value: 4 axis: "Breadth" }`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		lr, _, err := layout.Render(sirena.AllElementsView(doc), sirena.RenderOptions{Diagram: kind})
+		if err != nil {
+			t.Fatal(err)
+		}
+		data, err := scene3d.Build(lr, scene3d.Options{Tour: "nodes"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Contains(data, []byte("chart:axes")) || !bytes.Contains(data, []byte("slideSteps")) {
+			t.Fatal("axes or tour missing")
+		}
+		if kind == "scatter" && bytes.Contains(data, []byte("chart:series:0")) {
+			t.Fatal("scatter connected points")
+		}
+	}
+}

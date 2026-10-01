@@ -4,7 +4,7 @@
      Do not edit by hand — change compatSamples in compat_matrix_test.go and run
      `UPDATE_COMPAT_MATRIX=1 go test ./ingest/mermaid` to regenerate. -->
 
-Sirena ingests Mermaid **flowcharts** (`graph` / `flowchart`) into its typed IR
+Sirena ingests Mermaid **flowcharts, sequences, states, classes and mindmaps** into its typed IR
 and renders them to deterministic SVG. This matrix classifies how representative
 Mermaid features survive that ingestion.
 
@@ -19,8 +19,8 @@ Outcomes:
 - **partial** — the flowchart renders but some statements were dropped (parse errors
   or unsupported statement types). Rare: malformed input usually classifies as
   *unsupported* instead, because the flowchart node fails to parse at all.
-- **unsupported** — nothing renders; the input is not a flowchart (e.g.
-  `sequenceDiagram`, `pie`, `gantt`).
+- **unsupported** — nothing renders; the input contains unsupported syntax (e.g.
+  `loop`, `pie`, `gantt`).
 
 | Feature | Sample | Outcome |
 |---|---|---|
@@ -35,7 +35,11 @@ Outcomes:
 | classDef + class | `graph TD; A --> B; classDef big fill:#f00; class A big` | styling-dropped |
 | linkStyle directive | `graph LR; A --> B; linkStyle 0 stroke:#f00` | styling-dropped |
 | click / interaction | `graph TD; A --> B; click A "https://x"` | styling-dropped |
-| sequenceDiagram | `sequenceDiagram; A->>B: hi` | unsupported |
+| Sequence participants and messages | `sequenceDiagram; participant A as Client; A->>B: hi` | full |
+| State aliases and transitions | `stateDiagram-v2; [*] --> Ready; Ready --> [*]: stop` | full |
+| Class members and relationships | `classDiagram; class A {; +name: string; +save(); }; A --> B: uses` | full |
+| Indented mindmaps | `mindmap; root((Plan)); topic[Build]` | full |
+| Sequence control blocks | `sequenceDiagram; loop retry; A->>B: hi; end` | unsupported |
 | pie chart | `pie; "a" : 10` | unsupported |
 | gantt chart | `gantt; title X` | unsupported |
 

@@ -4,6 +4,14 @@ All notable changes to sirena will be documented in this file.
 
 ## Unreleased
 
+## v0.6.0 — 2026-10-01
+
+- Add line/scatter, radar and weighted DAG Sankey diagrams, with native Scene3D projections for line/scatter and radar.
+- Import bounded Mermaid sequence, state, class and mindmap syntax with source diagnostics for unsupported constructs.
+- Add stable SVG storyboards, shared chart domains, `sirena storyboard`, and warmed pipeline measurements with `sirena bench`.
+- Reuse complete SVG label runs; the fixed 500-card fixture is 82% smaller and protected by a byte ceiling.
+- Preserve authored identities alongside generated state/mindmap nodes; validate class members and clean obsolete generated storyboard frames on reruns.
+
 ## v0.0.1-internal — 2026-05-28
 
 First internal release. IR frozen per ADR 0001.

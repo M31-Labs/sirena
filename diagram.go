@@ -8,7 +8,7 @@ type LifelinePlacement struct {
 
 func ValidDiagram(name string) bool {
 	switch name {
-	case "architecture", "sequence", "radial", "state", "class", "er", "swimlane", "timeline", "mindmap", "bar", "pie", "gantt":
+	case "architecture", "sequence", "radial", "state", "class", "er", "swimlane", "timeline", "mindmap", "bar", "pie", "gantt", "line", "scatter", "sankey", "radar":
 		return true
 	}
 	return false
@@ -60,4 +60,26 @@ type PieSlicePlacement struct {
 	Node                                *Element
 	Center                              Point
 	Radius, Start, End, Value, Fraction float64
+}
+
+// PlotPlacement carries numerical axes separately from data point boxes.
+type PlotPlacement struct {
+	Bounds                 Rect
+	XMin, XMax, YMin, YMax float64
+	Series                 []ChartSeries
+}
+type ChartSeries struct {
+	Name   string
+	Points []Point
+}
+type RadarPlacement struct {
+	Center          Point
+	Radius, Maximum float64
+	Axes            []string
+	Series          []ChartSeries
+}
+type FlowPlacement struct {
+	Edge         *Edge
+	From, To     Point
+	Width, Value float64
 }

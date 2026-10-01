@@ -1,0 +1,7 @@
+service visits { label: "Visits" }
+service signup { label: "Sign-ups" }
+service browse { label: "Browse" }
+service active { label: "Active" }
+visits -> signup: flow "120"
+visits -> browse: flow "280"
+signup -> active: flow "90"

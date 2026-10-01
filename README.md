@@ -53,9 +53,12 @@ nodes, edges, summaries, and nested boundary frames. Keyframes are capped at 128
 ### Diagram families and semantic presentation beats
 
 `render --diagram` supports **architecture, sequence, radial, state, class, er,
-swimlane, timeline, mindmap, bar, pie, and gantt**. The same declaration identities and relationships
-survive SVG and Scene3D export. Pie uses SVG; the other families can use native 3D. These are native Sirena layouts; Mermaid
-import remains limited to flowcharts.
+swimlane, timeline, mindmap, bar, pie, gantt, line, scatter, sankey, and radar**. The same declaration identities and relationships
+survive SVG and Scene3D export. Pie and Sankey use SVG; the other families support native 3D. Mermaid import also
+supports flat sequences, states, classes, and indented mindmaps. Control blocks,
+notes and styling in those new families are diagnosed. Class members support bare
+identifiers, optional visibility, name/type fields and balanced method signatures
+with optional return types (up to 256 members per class, 2048 bytes each); see [tested compatibility](docs/mermaid-compatibility.md).
 
 - `state`: rounded states with `state: "initial"` / `state: "final"` markers.
 - `class` / `er`: measured record compartments. Use `fields: "id: UUID; name: string"`
@@ -73,6 +76,32 @@ import remains limited to flowcharts.
   legend with values and percentages. At most 100 slices; no relationships.
 - `gantt`: `start: "2026-10-01" end: "2026-10-04"` uses actual UTC calendar days
   and an exclusive end date. Dependency relationships remain visible.
+
+- `line` / `scatter`: numeric `x` and `y`, optional `series: "Adoption"`. Line points
+  sort by x; scatter points stay unconnected. Axes, legends and accessible values are retained.
+- `radar`: non-negative `value`, `axis: "Speed"`, optional `series`. Each series
+  must contain the same 3–32 axes exactly once.
+- `sankey`: forward DAG relationships with positive numeric labels (`"120"`).
+  Flow widths preserve ratios; cycles, invalid weights and reverse edges produce errors.
+
+### Stable diagram stories
+
+```sh
+sirena storyboard --diagram bar --out story examples/storyboard/before.sir examples/storyboard/after.sir
+```
+
+This writes numbered SVG states and `storyboard.json` with a transition duration.
+`fence.Storyboard` and `layout.Storyboard` expose the same library behavior:
+flat architecture/state/class/ER/mindmap actors reserve union slots, bars reserve
+rows, and line/scatter/radar charts share numerical scales. Up to 32 states,
+1000 union nodes and 2000 union relationships; caller metadata stays immutable.
+Radar axis order must match. Unsupported families and incompatible mindmap unions
+fail explicitly. Repeated labels share whole glyph runs and glyph outlines, reducing bytes and DOM nodes
+without substituting system fonts. Each SVG retains `data-morph-id` identities for presentation animation.
+
+The existing Go CI job enforces a 700 KB SVG ceiling for a deterministic 500-card
+fixture and checks weighted flows, shared scales, stable slots and invalid-data
+handling. This is an output regression budget, not a claim of Mermaid performance parity.
 
 Copy the runnable sources in `examples/diagrams/`. Non-architecture layouts
 require flat views and reject nested boundaries rather than dropping them.

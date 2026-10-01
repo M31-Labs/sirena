@@ -1,0 +1,3 @@
+service adoption { label: "Adoption" value: 84 }
+service speed { label: "Speed" value: 68 }
+service breadth { label: "Breadth" value: 56 }

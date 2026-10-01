@@ -10,7 +10,7 @@ import (
 // returns a nil document, a non-nil error, and a SIR-MERMAID-NOT-A-GRAPH
 // diagnostic.
 func TestDiag_NotAGraph(t *testing.T) {
-	src := []byte("sequenceDiagram\n  A->>B: hi\n")
+	src := []byte("journey\n  A->>B: hi\n")
 	doc, diags, err := Parse(src, Options{})
 
 	if doc != nil {

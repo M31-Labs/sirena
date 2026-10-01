@@ -1,0 +1,2 @@
+service adoption { label: "Adoption" value: 18 }
+service speed { label: "Speed" value: 42 }

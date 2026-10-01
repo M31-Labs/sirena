@@ -24,7 +24,7 @@ func TestClassify(t *testing.T) {
 		},
 		{
 			name: "non-flowchart diagram type",
-			src:  "sequenceDiagram\n  A->>B: hi\n",
+			src:  "journey\n  A->>B: hi\n",
 			want: CompatUnsupported,
 		},
 	}

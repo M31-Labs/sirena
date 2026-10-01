@@ -39,7 +39,7 @@ func RunRender(args []string, stdout, stderr io.Writer) int {
 	shaderTargets := fs.String("targets", "", "comma-separated shader node identities")
 	motion := fs.Bool("motion", false, "slow node rotation (requires --scene3d)")
 	stepsPath := fs.String("steps", "", "absolute presentation keyframes JSON (requires --scene3d)")
-	diagram := fs.String("diagram", "", "diagram geometry: architecture, sequence, radial, state, class, er, swimlane, timeline, mindmap, bar, pie, or gantt")
+	diagram := fs.String("diagram", "", "diagram geometry: architecture, sequence, radial, state, class, er, swimlane, timeline, mindmap, bar, pie, gantt, line, scatter, sankey, or radar")
 	tour := fs.String("tour", "", "generate presentation steps: nodes or relationships (requires --scene3d)")
 	motionSpeed := fs.Float64("motion-speed", -1, "spin or float speed in radians/second")
 	motionDistance := fs.Float64("motion-distance", -1, "float amplitude in world units")
@@ -86,7 +86,7 @@ func RunRender(args []string, stdout, stderr io.Writer) int {
 	}
 
 	if *diagram != "" && !sirena.ValidDiagram(*diagram) {
-		fmt.Fprintln(stderr, "--diagram must be architecture, sequence, radial, state, class, er, swimlane, timeline, mindmap, bar, pie, or gantt")
+		fmt.Fprintln(stderr, "--diagram must be architecture, sequence, radial, state, class, er, swimlane, timeline, mindmap, bar, pie, gantt, line, scatter, sankey, or radar")
 		return 2
 	}
 	if *tour != "" && *tour != "nodes" && *tour != "relationships" {

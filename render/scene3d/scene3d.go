@@ -58,8 +58,8 @@ type Timeline struct {
 // It leaves the layout and IR untouched. Scene labels retain readable node and
 // relationship text; arrowheads preserve reverse and bidirectional relations.
 func Build(lr *sirena.LayoutResult, opts Options) ([]byte, error) {
-	if lr != nil && lr.Diagram == "pie" {
-		return nil, fmt.Errorf("sirena scene3d: pie currently requires SVG export; use bar for native 3D data")
+	if lr != nil && (lr.Diagram == "pie" || lr.Diagram == "sankey") {
+		return nil, fmt.Errorf("sirena scene3d: %s currently requires SVG export; use bar, line, scatter or radar for native 3D data", lr.Diagram)
 	}
 	if opts.MotionStyle != "" && opts.MotionStyle != "spin" && opts.MotionStyle != "float" {
 		return nil, fmt.Errorf("sirena scene3d: motion style must be spin or float")
@@ -148,6 +148,9 @@ func Build(lr *sirena.LayoutResult, opts Options) ([]byte, error) {
 		if lr.Diagram == "bar" || lr.Diagram == "gantt" || lr.Diagram == "timeline" {
 			geometry = scene.BoxGeometry{Width: width, Height: height, Depth: .35}
 		}
+		if lr.Plot != nil || lr.Radar != nil {
+			geometry = scene.SphereGeometry{Radius: .045, Segments: 16}
+		}
 		material := scene.Material(scene.StandardMaterial{Color: color, Roughness: .35, Metalness: .15})
 		if custom != nil && (len(selected) == 0 || selected[id]) {
 			material = custom
@@ -180,7 +183,12 @@ func Build(lr *sirena.LayoutResult, opts Options) ([]byte, error) {
 		}
 
 		text := elementLabel(n)
-		if lr.Diagram == "bar" {
+		if lr.Plot != nil {
+			x, _ := n.Metadata["x"].(sirena.Number)
+			y, _ := n.Metadata["y"].(sirena.Number)
+			text += fmt.Sprintf(": (%g, %g)", x.Value, y.Value)
+		}
+		if lr.Diagram == "bar" || lr.Radar != nil {
 			if value, ok := n.Metadata["value"].(sirena.Number); ok {
 				text = fmt.Sprintf("%s: %g", text, value.Value)
 			}
@@ -195,6 +203,65 @@ func Build(lr *sirena.LayoutResult, opts Options) ([]byte, error) {
 		// so the label keeps following its mesh during browser animation.
 		label.Shift, label.DriftSpeed, label.DriftPhase = mesh.Drift, mesh.DriftSpeed, mesh.DriftPhase
 		if err := emit(mesh, label); err != nil {
+			return nil, err
+		}
+	}
+	if lr.Plot != nil || lr.Radar != nil {
+		var series []sirena.ChartSeries
+		if lr.Plot != nil {
+			series = lr.Plot.Series
+		}
+		if lr.Radar != nil {
+			series = lr.Radar.Series
+		}
+		if lr.Diagram != "scatter" {
+			for i, s := range series {
+				var points []scene.Vector3
+				var segments [][2]int
+				for j, p := range s.Points {
+					points = append(points, point(p))
+					if j > 0 {
+						segments = append(segments, [2]int{j - 1, j})
+					}
+				}
+				if lr.Radar != nil && len(points) > 2 {
+					segments = append(segments, [2]int{len(points) - 1, 0})
+				}
+				id := fmt.Sprintf("chart:series:%d", i)
+				if err := add(id); err != nil {
+					return nil, err
+				}
+				if err := emit(scene.Mesh{ID: id, Geometry: scene.LinesGeometry{Points: points, Segments: segments, Width: 2}, Material: scene.StandardMaterial{Color: "#a8d7f2", Emissive: 1}}); err != nil {
+					return nil, err
+				}
+			}
+		}
+		var axes []sirena.Point
+		if p := lr.Plot; p != nil {
+			axes = []sirena.Point{p.Bounds.Min, {X: p.Bounds.Min.X, Y: p.Bounds.Max.Y}, {X: p.Bounds.Min.X, Y: p.Bounds.Max.Y}, p.Bounds.Max}
+			if err := emit(scene.Label{ID: "chart:domain", Text: fmt.Sprintf("x: %g … %g · y: %g … %g", p.XMin, p.XMax, p.YMin, p.YMax), Position: point(sirena.Point{X: p.Bounds.Center().X, Y: p.Bounds.Max.Y + 36}), Color: "#bacdd2", Font: "12px sans-serif", AnchorX: .5, AnchorY: .5}); err != nil {
+				return nil, err
+			}
+		}
+		if r := lr.Radar; r != nil {
+			for i, label := range r.Axes {
+				angle := -math.Pi/2 + float64(i)*2*math.Pi/float64(len(r.Axes))
+				p := sirena.Point{X: r.Center.X + r.Radius*math.Cos(angle), Y: r.Center.Y + r.Radius*math.Sin(angle)}
+				axes = append(axes, r.Center, p)
+				if err := emit(scene.Label{ID: fmt.Sprintf("chart:axis:%d", i), Text: label, Position: point(p), Color: "#bacdd2", Font: "12px sans-serif", AnchorX: .5, AnchorY: .5, OffsetY: -16}); err != nil {
+					return nil, err
+				}
+			}
+		}
+		var points []scene.Vector3
+		var segments [][2]int
+		for i, p := range axes {
+			points = append(points, point(p))
+			if i%2 == 1 {
+				segments = append(segments, [2]int{i - 1, i})
+			}
+		}
+		if err := emit(scene.Mesh{ID: "chart:axes", Geometry: scene.LinesGeometry{Points: points, Segments: segments, Width: 1}, Material: scene.StandardMaterial{Color: "#658d98", Emissive: 1}}); err != nil {
 			return nil, err
 		}
 	}

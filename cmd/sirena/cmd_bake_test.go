@@ -11,9 +11,9 @@ import (
 // validMermaidMD is a minimal markdown file with one renderable mermaid fence.
 const validMermaidMD = "# Doc\n\n```mermaid\nflowchart LR\n  A --> B\n```\n"
 
-// invalidFenceMD contains a sequenceDiagram fence — sirena treats this as
+// invalidFenceMD contains a journey fence — sirena treats this as
 // NOT-A-GRAPH, so it will produce a block error.
-const invalidFenceMD = "# Bad\n\n```mermaid\nsequenceDiagram\n  A ->> B: hi\n```\n"
+const invalidFenceMD = "# Bad\n\n```mermaid\njourney\n  A ->> B: hi\n```\n"
 
 // ── TestRunBake_SingleFile ────────────────────────────────────────────────────
 
