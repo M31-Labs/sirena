@@ -62,7 +62,7 @@ func RunStoryboard(args []string, stdout, stderr io.Writer) int {
 	names := []string{}
 	for i, data := range frames {
 		name := fmt.Sprintf("state-%02d.svg", i)
-		if err := os.WriteFile(filepath.Join(*out, name), data, 0644); err != nil {
+		if err := writeStoryboardFile(*out, name, data); err != nil {
 			fmt.Fprintln(stderr, err)
 			return 1
 		}
@@ -82,10 +82,33 @@ func RunStoryboard(args []string, stdout, stderr io.Writer) int {
 		Frames   []string `json:"frames"`
 		Duration int      `json:"durationMS"`
 	}{names, *duration}, "", "  ")
-	if err := os.WriteFile(filepath.Join(*out, "storyboard.json"), manifest, 0644); err != nil {
+	if err := writeStoryboardFile(*out, "storyboard.json", manifest); err != nil {
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
 	fmt.Fprintf(stdout, "%d states written to %s\n", len(frames), *out)
 	return 0
+}
+
+// Publish a complete file by replacing the destination directory entry. An
+// existing symlink or hard link never redirects writes into its target file.
+func writeStoryboardFile(dir, name string, data []byte) error {
+	f, err := os.CreateTemp(dir, ".sirena-storyboard-*")
+	if err != nil {
+		return err
+	}
+	temp := f.Name()
+	defer os.Remove(temp)
+	if err := f.Chmod(0644); err != nil {
+		f.Close()
+		return err
+	}
+	if _, err := f.Write(data); err != nil {
+		f.Close()
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	return os.Rename(temp, filepath.Join(dir, name))
 }

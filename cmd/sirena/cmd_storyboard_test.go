@@ -53,3 +53,52 @@ func TestStoryboardRerunRemovesOnlyPreviousGeneratedFrames(t *testing.T) {
 		t.Fatal("invalid rerun changed manifest", err)
 	}
 }
+
+func TestStoryboardPublicationDoesNotWriteThroughLinks(t *testing.T) {
+	dir := t.TempDir()
+	out := filepath.Join(dir, "output")
+	if err := os.Mkdir(out, 0755); err != nil {
+		t.Fatal(err)
+	}
+	source := filepath.Join(dir, "input.sir")
+	if err := os.WriteFile(source, []byte(`service api { value: 12 }`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	outside := filepath.Join(dir, "outside.svg")
+	if err := os.WriteFile(outside, []byte("unrelated content"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(out, "state-00.svg")); err != nil {
+		t.Skip("symlink creation unavailable:", err)
+	}
+	if err := os.Link(outside, filepath.Join(out, "state-01.svg")); err != nil {
+		t.Fatal(err)
+	}
+	priorManifest := filepath.Join(dir, "outside.json")
+	prior := []byte(`{"frames":[]}`)
+	if err := os.WriteFile(priorManifest, prior, 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(priorManifest, filepath.Join(out, "storyboard.json")); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	if code := RunStoryboard([]string{"--diagram", "bar", "--out", out, source, source}, &stdout, &stderr); code != 0 {
+		t.Fatal(code, stderr.String())
+	}
+	for _, file := range []string{"state-00.svg", "state-01.svg", "storyboard.json"} {
+		info, err := os.Lstat(filepath.Join(out, file))
+		if err != nil || !info.Mode().IsRegular() {
+			t.Fatal("generated file is not regular", file, err)
+		}
+	}
+	if data, err := os.ReadFile(outside); err != nil || string(data) != "unrelated content" {
+		t.Fatal("linked target overwritten", err)
+	}
+	if data, err := os.ReadFile(priorManifest); err != nil || !bytes.Equal(data, prior) {
+		t.Fatal("manifest target overwritten", err)
+	}
+	if files, err := filepath.Glob(filepath.Join(out, ".sirena-storyboard-*")); err != nil || len(files) != 0 {
+		t.Fatal("temporary files leaked", files, err)
+	}
+}
