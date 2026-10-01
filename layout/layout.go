@@ -67,6 +67,22 @@ func Render(rv *sirena.ResolvedView, opts sirena.RenderOptions) (*sirena.LayoutR
 // view's layout hints. Edge routing (Phases C) and the force preset
 // (Phase E) graft into this entrypoint in later tasks.
 func Compute(rv *sirena.ResolvedView, opts LayoutOptions) (*sirena.LayoutResult, error) {
+	if rv != nil {
+		if err := validatePorts(rv); err != nil {
+			return nil, err
+		}
+	}
+	lr, err := computeLayout(rv, opts)
+	if err != nil || opts.Previous == nil || rv == nil {
+		return lr, err
+	}
+	if err := stabilizeLayout(lr, opts.Previous); err != nil {
+		return nil, err
+	}
+	return lr, nil
+}
+
+func computeLayout(rv *sirena.ResolvedView, opts LayoutOptions) (*sirena.LayoutResult, error) {
 	var seed [32]byte
 	if opts.Seed != nil {
 		seed = *opts.Seed
@@ -222,6 +238,7 @@ func Compute(rv *sirena.ResolvedView, opts LayoutOptions) (*sirena.LayoutResult,
 	ports := assignPorts(lr.NodePlacements, rv.Edges)
 	lr.EdgeRoutes = routeEdges(lr.NodePlacements, ports, rv.Edges)
 	placeLabels(lr.EdgeRoutes, lr.NodePlacements, metrics)
+	lr.Bounds = unionRect(lr.Bounds, diagramBounds(lr))
 
 	return lr, nil
 }

@@ -7,7 +7,7 @@ import (
 	"slices"
 )
 
-// Storyboard reserves stable graph slots and chart domains across 2–32 flat
+// Storyboard reserves stable graph slots and chart domains across 2–32
 // states. Names identify actors. Caller-owned views and metadata are read-only.
 func Storyboard(views []*sirena.ResolvedView, opts sirena.RenderOptions) ([]*sirena.LayoutResult, error) {
 	if len(views) < 2 || len(views) > 32 {
@@ -32,8 +32,15 @@ func Storyboard(views []*sirena.ResolvedView, opts sirena.RenderOptions) ([]*sir
 		if v == nil {
 			return nil, fmt.Errorf("sirena: state %d is nil", i)
 		}
-		if _, err := flatActors(v); err != nil {
-			return nil, err
+		if i == 0 {
+			union.Source = v.Source
+		}
+		if kind != "architecture" || len(v.Boundaries) == 0 {
+			if _, err := flatActors(v); err != nil {
+				return nil, err
+			}
+		} else if len(v.Summaries) > 0 {
+			return nil, fmt.Errorf("sirena: nested storyboards do not support collapsed summaries")
 		}
 		if opts.Diagram == "" && sirena.DiagramName(v) != kind {
 			return nil, fmt.Errorf("sirena: storyboard families must match")
@@ -71,6 +78,11 @@ func Storyboard(views []*sirena.ResolvedView, opts sirena.RenderOptions) ([]*sir
 	}
 	if len(union.Elements) > 1000 || len(union.Edges) > 2000 {
 		return nil, fmt.Errorf("sirena: storyboard union exceeds 1000 nodes or 2000 edges")
+	}
+	if kind == "architecture" {
+		if err := mergeStoryBoundaries(views, union); err != nil {
+			return nil, err
+		}
 	}
 	bounds := sirena.Rect{}
 	switch kind {
@@ -170,13 +182,35 @@ func Storyboard(views []*sirena.ResolvedView, opts sirena.RenderOptions) ([]*sir
 		for _, np := range reference.NodePlacements {
 			slots[np.Node.Name] = np.Bounds
 		}
+		boundarySlots := map[string]*sirena.BoundaryPlacement{}
+		var collectBoundaries func([]*sirena.BoundaryPlacement)
+		collectBoundaries = func(items []*sirena.BoundaryPlacement) {
+			for _, bp := range items {
+				boundarySlots[bp.Boundary.Name] = bp
+				collectBoundaries(bp.Children)
+			}
+		}
+		collectBoundaries(reference.BoundaryPlacements)
+		var applyBoundarySlots func([]*sirena.BoundaryPlacement)
+		applyBoundarySlots = func(items []*sirena.BoundaryPlacement) {
+			for _, bp := range items {
+				if ref := boundarySlots[bp.Boundary.Name]; ref != nil {
+					bp.Bounds, bp.ChildrenBounds = ref.Bounds, ref.ChildrenBounds
+				}
+				applyBoundarySlots(bp.Children)
+			}
+		}
 		for _, lr := range frames {
 			for _, np := range lr.NodePlacements {
 				np.Bounds = slots[np.Node.Name]
 			}
+			applyBoundarySlots(lr.BoundaryPlacements)
 			lr.EdgeRoutes = routeEdges(lr.NodePlacements, assignPorts(lr.NodePlacements, lr.View.Edges), lr.View.Edges)
 			placeLabels(lr.EdgeRoutes, lr.NodePlacements, DefaultMetrics())
 			lr.Bounds = diagramBounds(lr)
+			for _, bp := range lr.BoundaryPlacements {
+				lr.Bounds = unionRect(lr.Bounds, bp.Bounds)
+			}
 		}
 		bounds = reference.Bounds
 	}

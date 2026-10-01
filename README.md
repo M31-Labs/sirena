@@ -2,7 +2,7 @@
 
 A modernized diagram language and renderer. Arch/systems diagrams as the wedge, with a multi-file project model and a pure-Go layout engine — designed to be mdpp's native diagram surface. No JavaScript toolchain, no headless browser; pure Go end to end.
 
-**Status:** SVG and native GoSX Scene3D export, with 12 native diagram families, deterministic layouts, and reusable SVG glyphs.
+**Status:** SVG and native GoSX Scene3D export, with 16 native diagram families, deterministic layouts, and reusable SVG glyphs.
 
 Install from source with Go 1.26 or newer:
 
@@ -85,6 +85,33 @@ with optional return types (up to 256 members per class, 2048 bytes each); see [
   Flow widths preserve ratios; cycles, invalid weights and reverse edges produce errors.
 
 ### Stable diagram stories
+
+Architecture stories support nested boundaries. A union layout reserves actor
+and boundary slots across all states, including actors introduced later.
+Boundary membership and kinds must remain consistent; collapsed summaries are
+diagnosed. Source trees remain unchanged. Numerical charts retain their shared
+scale behavior.
+
+For interactive structural edits, `layout.Compute(view, layout.LayoutOptions{
+Previous: priorLayout})` preserves existing actor centers using stable `sid`
+metadata or declaration names. New or enlarged actors move when needed to avoid
+overlap; nested frames refit around their children. Supported families are
+architecture, state, class, ER, and mindmap.
+
+Relationships accept explicit attachment hints:
+
+```sirena
+api -> worker: calls "dispatch" {
+  source_port: "right:0.25"
+  target_port: "left:0.75"
+}
+```
+
+Use `top`, `right`, `bottom`, or `left`, optionally followed by an offset from
+0 to 1. Omitting the offset distributes attachments along that side. Invalid
+hints report errors. Obstructed orthogonal routes use a bounded visibility
+search; captions reserve space against both actors and other captions. Canvas
+bounds include routed lines and relocated captions.
 
 ```sh
 sirena storyboard --diagram bar --out story examples/storyboard/before.sir examples/storyboard/after.sir
