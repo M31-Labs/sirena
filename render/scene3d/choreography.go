@@ -54,6 +54,15 @@ func choreographySteps(lr *sirena.LayoutResult, steps []Step) ([]Step, error) {
 		step.Patches = append([]Patch(nil), original.Patches...)
 		patches := map[string]Patch{}
 		for _, patch := range step.Patches {
+			// Normalize declaration aliases without rejecting native object IDs
+			// such as boundary frames and lifelines. The timeline validates them.
+			if _, ok := ids[patch.Target]; ok {
+				id, err := resolve(patch.Target)
+				if err != nil {
+					return nil, err
+				}
+				patch.Target = id
+			}
 			if _, ok := patches[patch.Target]; ok {
 				return nil, fmt.Errorf("sirena scene3d: duplicate step target %q", patch.Target)
 			}
